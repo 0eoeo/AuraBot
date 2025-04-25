@@ -84,8 +84,8 @@ async def recognize(request: Request, background_tasks: BackgroundTasks):
 
     # Распознавание текста
     result = model.transcribe(wav_path, language="ru")
-    text = result.get('text', '').strip()
-    print(f"📝 {speaker}: {text}")
+    text = f"[{speaker}]: {result.get('text', '').strip()}"
+    print(f"📝 [{speaker}]: {text}")
 
     if not text:
         cleanup([pcm_path, wav_path])
