@@ -19,7 +19,7 @@ const { spawn } = require('child_process');
 const COOKIE_STRING = 'PREF=...; VISITOR_INFO1_LIVE=...; YSC=...; SID=...; HSID=...; SSID=...; APISID=...; SAPISID=...; LOGIN_INFO=...';
 const SILENCE_TIMEOUT = 5000;
 const RECORDINGS_DIR = './recordings';
-const token = 'MTM2MTczNTEwMTU3ODM1MDY5Mg.GbLjji.RIKgY3fUgdLFdkB6u61GVUssNQSHih-nr9ngYk'; // не храни токен в коде!
+const token = 'MTM2MTczNTEwMTU3ODM1MDY5Mg.GFNAUy.jhGaWwVd2KNiIiSEI7TPRkUb0X9q8WXdxdNhqA'; // не храни токен в коде!
 const queue = new Map(); // Очередь воспроизведения для каждого канала
 
 const client = new Client({
@@ -244,7 +244,7 @@ function startRecording(userId, user, connection) {
             }
 
             const speakerName = Buffer.from(user.displayName, 'utf-8').toString('base64');
-            const res = await axios.post('http://localhost:5000/recognize', audioData, {
+            const res = await axios.post('http://192.168.2.117:5000/recognize', audioData, {
                 responseType: 'arraybuffer',
                 headers: {
                     'Content-Type': 'application/octet-stream',
