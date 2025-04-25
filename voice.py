@@ -13,9 +13,13 @@ torch.serialization.add_safe_globals([XttsConfig, XttsAudioConfig, BaseDatasetCo
 tts = TTS(model_name="tts_models/multilingual/multi-dataset/xtts_v2")
 
 
-def create_voice_answer(text, device="cuda"):
+# Функция для создания голосового ответа
+def create_voice_answer(text, device=None):
     speaker_wav = "няру.wav"
     output_path = "output.wav"
+
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
 
     try:
         tts.to(device)
@@ -26,14 +30,12 @@ def create_voice_answer(text, device="cuda"):
             file_path=output_path
         )
 
-        # Проверяем, создан ли файл и не пустой ли он
         if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
-            print(f"🔊 Аудиофайл сохранён в: {output_path}")
+            print(f"🔊 Аудиофайл успешно сохранён в: {output_path}")
             return output_path
         else:
-            print("⚠️ Файл не создан или пустой!")
+            print("⚠️ Ошибка: файл не создан или пустой!")
             return None
-
     except Exception as e:
-        print(f"❌ Ошибка генерации речи: {e}")
+        print(f"❌ Ошибка при генерации речи: {e}")
         return None
