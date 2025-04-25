@@ -20,10 +20,6 @@ app = FastAPI()
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model = whisper.load_model("tiny", device=device)
 
-# Загружаем модель для генерации речи
-torch.serialization.add_safe_globals(["XttsConfig", "XttsAudioConfig", "BaseDatasetConfig", "XttsArgs"])
-tts = TTS(model_name="tts_models/multilingual/multi-dataset/xtts_v2")
-
 # Инициализация переменных
 blocked_phrases = [
     "динамичная музыка", "редактор субтитров", "сильный шум",
