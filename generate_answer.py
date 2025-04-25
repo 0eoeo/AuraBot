@@ -1,10 +1,17 @@
+import os
+
 from langchain.schema import HumanMessage, SystemMessage
 from langchain_community.chat_models.gigachat import GigaChat
-from pprint import pprint
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+GIGACHAT_TOKEN = os.getenv('GIGACHAT_TOKEN')
 
 class BotState:
-    def __init__(self, credentials: str, max_history: int = 10):
-        self.chat = GigaChat(credentials=credentials, verify_ssl_certs=False)
+    def __init__(self):
+        self.chat = GigaChat(credentials=GIGACHAT_TOKEN, verify_ssl_certs=False)
         self.messages = [
             SystemMessage(
                 content="Тебя зовут Няру, тебе 23 года и ты парень. "
@@ -15,7 +22,7 @@ class BotState:
                         "Отвечай кратко."
             )
         ]
-        self.max_history = max_history
+        self.max_history = 10
         self.context_version = 0
 
     def append_context(self, message: str):
