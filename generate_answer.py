@@ -1,5 +1,3 @@
-# bot_state.py
-
 from langchain.schema import HumanMessage, SystemMessage
 from langchain_community.chat_models.gigachat import GigaChat
 from pprint import pprint
@@ -14,6 +12,7 @@ class BotState:
                         "Ты любишь общаться с людьми."
                         "Ты находишься в голосовом чате с группой людей. Отвечай всем дружелюбно и поддерживай разговор."
                         "Отвечай на реплики участников с юмором и интересом, называй их по имени, если это уместно."
+                        "Отвечай кратко."
             )
         ]
         self.max_history = max_history

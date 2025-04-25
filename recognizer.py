@@ -1,40 +1,37 @@
-import torch
-from flask import Flask, request, send_file, jsonify
-import tempfile
-import whisper
-from pydub import AudioSegment
 import os
 import base64
-import threading
+import tempfile
+import asyncio
+from typing import Optional
+
+from fastapi import FastAPI, Request, BackgroundTasks, Header
+from fastapi.responses import FileResponse, JSONResponse
+from pydub import AudioSegment
+from dotenv import load_dotenv
+
+import whisper
+import torch
 
 from generate_answer import BotState
 from voice import create_voice_answer
 
-app = Flask(__name__)
+load_dotenv()
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model = whisper.load_model("tiny", device=device)
 
-
-bot = BotState(credentials="ODQyZDA4ZWItYmZiOC00MWU1LWIzZTMtZj"
-                           "IzNjc5N2RkZjc0OjY4YWZlNzMxLTg4Yzkt"
-                           "NDgxNy05Yjk4LTY2ODNkYjMzMjAyMg==")
+app = FastAPI()
 
 blocked_phrases = [
-    "динамичная музыка",
-    "редактор субтитров",
-    "сильный шум",
-    "без звука",
-    "музыкальная заставка",
-    "ах ах ах"
+    "динамичная музыка", "редактор субтитров", "сильный шум",
+    "без звука", "музыкальная заставка", "ах ах ах"
 ]
 
-response_timer = None
-response_lock = threading.Lock()
-generated_audio_path = None
-ready_to_send = False
 
-
-def decode_speaker_name(encoded_name):
+def decode_speaker_name(encoded_name: Optional[str]) -> str:
+    if not encoded_name:
+        return "Бро"
     try:
         return base64.b64decode(encoded_name).decode("utf-8")
     except Exception:
@@ -51,114 +48,83 @@ def cleanup(paths):
             print(f"⚠️ Не удалось удалить {path}: {e}")
 
 
-def reset_response_timer():
-    global response_timer, generated_audio_path, ready_to_send
-    current_version = bot.context_version
+async def generate_voice_answer(bot: BotState, context_version: int):
+    await asyncio.sleep(1.0)
+    if bot.context_version != context_version:
+        print("⏩ Контекст изменился — генерация отменена")
+        return
 
-    def generate():
-        nonlocal current_version
-        if current_version != bot.context_version:
-            print(f"⏩ Контекст изменился (было {current_version}, стало {bot.context_version}) — пропускаем ответ")
-            return
+    print("🧠 Генерирую голосовой ответ")
+    text = bot.get_response_text()
+    if not text:
+        print("⚠️ Пустой ответ от GigaChat")
+        return
 
-        print("🧠 Пауза соблюдена, генерирую голосовой ответ")
-        response_text = bot.get_response_text()
-        if response_text:
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            path = create_voice_answer(response_text, device=device)
+    output_path = "output.wav"
+    path = create_voice_answer(text, device=device)
 
-            if path and os.path.exists(path):
-                generated_audio_path = path
-                print(f"✅ Ответ сгенерирован: {generated_audio_path}")
-                ready_to_send = True
-            else:
-                print("⚠️ Ошибка при создании голосового ответа или файл не существует")
-        else:
-            print("⚠️ Пустой ответ от GigaChat")
-
-    with response_lock:
-        if response_timer:
-            response_timer.cancel()
-        response_timer = threading.Timer(1.0, generate)
-        response_timer.start()
+    if path and os.path.exists(path):
+        print(f"✅ Ответ сгенерирован: {output_path}")
+    else:
+        print("⚠️ Не удалось создать аудио")
 
 
-@app.route('/recognize', methods=['POST'])
-def recognize():
-    global response_timer, generated_audio_path, ready_to_send
+@app.post("/recognize")
+async def recognize_audio(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    x_speaker_name: Optional[str] = Header(None)
+):
+    speaker = decode_speaker_name(x_speaker_name)
+    print(f"📥 Запрос от: {speaker}")
 
-    speaker_b64 = request.headers.get("X-Speaker-Name")
-    speaker = decode_speaker_name(speaker_b64) if speaker_b64 else "Бро"
+    body = await request.body()
+    if not body:
+        return JSONResponse(content={"error": "Нет аудиоданных"}, status_code=400)
 
-    print(f"📥 Получен запрос на распознавание от {speaker}")
-    audio_data = request.data
-    if not audio_data:
-        return jsonify(error="No audio data provided"), 400
-
-    pcm_path, wav_path = None, None
-
-    # try:
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pcm") as tmp_pcm:
+        tmp_pcm.write(body)
         pcm_path = tmp_pcm.name
-        tmp_pcm.write(audio_data)
 
     wav_path = pcm_path + ".wav"
 
-    pcm_audio = AudioSegment.from_file(
-        pcm_path,
-        format="raw",
-        frame_rate=48000,
-        channels=2,
-        sample_width=2
-    )
-    pcm_audio.export(wav_path, format="wav")
+    try:
+        pcm_audio = AudioSegment.from_file(
+            pcm_path, format="raw", frame_rate=48000, channels=2, sample_width=2
+        )
+        pcm_audio.export(wav_path, format="wav")
+    except Exception as e:
+        print("❌ Ошибка при обработке PCM:", e)
+        cleanup([pcm_path])
+        return JSONResponse(content={"error": "Ошибка при обработке PCM"}, status_code=500)
 
     if len(pcm_audio) < 500:
-        print("⚠️ Аудио слишком короткое. Пропускаем.")
+        print("⚠️ Аудио слишком короткое")
         cleanup([pcm_path, wav_path])
-        return '', 204
-
-    if not os.path.exists(wav_path):
-        print("❌ WAV-файл не найден после экспорта")
-        cleanup([pcm_path])
-        return jsonify(error="WAV-файл не найден"), 500
+        return JSONResponse(content={"error": "Аудио слишком короткое"}, status_code=204)
 
     result = model.transcribe(wav_path, language="ru")
-    text = result.get('text', '').strip()
+    text = result.get("text", "").strip()
     print(f"📝 {speaker}: {text}")
-
-    if not text:
-        cleanup([pcm_path, wav_path])
-        return '', 204
-
-    if not any(phrase in text.lower() for phrase in blocked_phrases):
-        bot.append_context(f"{speaker}: {text}")
-        reset_response_timer()
-    else:
-        print("⛔ Обнаружена стоп-фраза — пропуск контекста")
 
     cleanup([pcm_path, wav_path])
 
-    if os.path.exists('output.wav'):
-        print(f"📤 Отправляю аудиофайл: {generated_audio_path}")
-        path_to_send = generated_audio_path
-        generated_audio_path = None
-        ready_to_send = False
-        try:
-            return send_file('output.wav', mimetype="audio/wav", as_attachment=True)
-        except Exception as e:
-            print(e)
-        finally:
-            cleanup(['output.wav'])
-    else:
-        print("⚠️ Нет готового аудиофайла для отправки")
-        return '', 204
+    if not text:
+        return JSONResponse(content={"error": "Пустая транскрипция"}, status_code=204)
 
-    # except Exception as e:
-    #     print("❌ Ошибка при обработке аудио:", e)
-    #     cleanup([pcm_path, wav_path])
-    #     return jsonify(error=str(e)), 500
+    if any(phrase in text.lower() for phrase in blocked_phrases):
+        print("⛔ Стоп-фраза. Пропускаем.")
+        return JSONResponse(content={"message": "Стоп-фраза"}, status_code=204)
 
+    bot = BotState(credentials=BOT_TOKEN)
+    bot.append_context(f"{speaker}: {text}")
+    background_tasks.add_task(generate_voice_answer, bot, bot.context_version)
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    # Пытаемся отправить предыдущий результат, если есть
+    if os.path.exists("output.wav"):
+        print("📤 Отправка output.wav")
+        response = FileResponse("output.wav", media_type="audio/wav", filename="response.wav")
+        background_tasks.add_task(cleanup, ["output.wav"])
+        return response
+
+    return JSONResponse(content={"message": "Ожидаем ответ"}, status_code=204)

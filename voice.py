@@ -10,10 +10,10 @@ from TTS.tts.models.xtts import XttsArgs
 torch.serialization.add_safe_globals([XttsConfig, XttsAudioConfig, BaseDatasetConfig, XttsArgs])
 
 # Загружаем модель (на CPU)
-tts = TTS(model_name="tts_models/multilingual/multi-dataset/xtts_v2", gpu=True)
+tts = TTS(model_name="tts_models/multilingual/multi-dataset/xtts_v2")
 
 
-def create_voice_answer(text,device="cuda"):
+def create_voice_answer(text, device="cuda"):
     speaker_wav = "няру.wav"
     output_path = "output.wav"
 
@@ -37,4 +37,3 @@ def create_voice_answer(text,device="cuda"):
     except Exception as e:
         print(f"❌ Ошибка генерации речи: {e}")
         return None
-# create_voice_answer('любая хуйня')

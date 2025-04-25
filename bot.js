@@ -16,10 +16,11 @@ const ytdl = require('ytdl-core');
 const ffmpeg = require('ffmpeg-static');
 const { spawn } = require('child_process');
 
+require('dotenv').config();
+const token = process.env.BOT_TOKEN;
 const COOKIE_STRING = 'PREF=...; VISITOR_INFO1_LIVE=...; YSC=...; SID=...; HSID=...; SSID=...; APISID=...; SAPISID=...; LOGIN_INFO=...';
 const SILENCE_TIMEOUT = 5000;
 const RECORDINGS_DIR = './recordings';
-const token = 'MTM2MTczNTEwMTU3ODM1MDY5Mg.GFNAUy.jhGaWwVd2KNiIiSEI7TPRkUb0X9q8WXdxdNhqA'; // не храни токен в коде!
 const queue = new Map(); // Очередь воспроизведения для каждого канала
 
 const client = new Client({
@@ -53,6 +54,11 @@ async function addToQueue(message, url) {
 
     if (!voiceChannel) {
         return message.reply('🔇 Ты должен быть в голосовом канале!');
+    }
+
+    // 🛡️ Проверка URL
+    if (!ytdl.validateURL(url)) {
+        return message.reply('❗ Указана некорректная YouTube ссылка.');
     }
 
     try {
@@ -102,8 +108,77 @@ client.on('messageCreate', async message => {
 
     if (message.content.startsWith('!play ')) {
         const url = message.content.split(' ')[1];
-        await addToQueue(message, url);
-    }
+            if (!ytdl.validateURL(url)) {
+                return message.reply('❗ Невалидная ссылка на YouTube!');
+            }
+
+            const voiceChannel = message.member.voice.channel;
+            if (!voiceChannel) return message.reply('🔇 Ты должен быть в голосовом канале!');
+
+            try {
+                const connection = joinVoiceChannel({
+                    channelId: voiceChannel.id,
+                    guildId: message.guild.id,
+                    adapterCreator: message.guild.voiceAdapterCreator
+                });
+
+                const ytdlpProcess = spawn('yt-dlp', [
+                    '-f', 'bestaudio',
+                    '-o', '-',
+                    url
+                ]);
+
+                const ffmpegProcess = spawn(ffmpeg, [
+                    '-i', 'pipe:0',
+                    '-f', 's16le',
+                    '-ar', '48000',
+                    '-ac', '2',
+                    'pipe:1'
+                ]);
+
+                ytdlpProcess.stdout.pipe(ffmpegProcess.stdin);
+
+                ytdlpProcess.stderr.on('data', data => {
+                    console.error(`yt-dlp error: ${data}`);
+                });
+
+                ytdlpProcess.on('close', code => {
+                    if (code !== 0) {
+                        console.error(`yt-dlp exited with code ${code}`);
+                    }
+                });
+
+                const resource = createAudioResource(ffmpegProcess.stdout, {
+                    inputType: StreamType.Raw
+                });
+
+                const player = createAudioPlayer();
+                connection.subscribe(player);
+                player.play(resource);
+
+                player.on(AudioPlayerStatus.Playing, () => {
+                    console.log('▶️ Музыка проигрывается');
+                    message.reply('🎶 Воспроизвожу музыку!');
+                });
+
+                player.on(AudioPlayerStatus.Idle, () => {
+                    console.log('⏹️ Музыка остановлена');
+                    if (connection.state.status !== 'destroyed') {
+                        connection.destroy();
+                    }
+                });
+
+                player.on('error', error => {
+                    console.error('🎧 Ошибка проигрывания:', error.message);
+                    if (connection.state.status !== 'destroyed') {
+                        connection.destroy();
+                    }
+                });
+            } catch (err) {
+                console.error('❌ Ошибка при воспроизведении:', err.message);
+                message.reply('⚠️ Произошла ошибка при попытке воспроизвести видео');
+            }
+        }
 
     if (message.content === '!skip') {
         skipSong(message);
