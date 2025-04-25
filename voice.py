@@ -13,11 +13,12 @@ torch.serialization.add_safe_globals([XttsConfig, XttsAudioConfig, BaseDatasetCo
 tts = TTS(model_name="tts_models/multilingual/multi-dataset/xtts_v2", gpu=True)
 
 
-def create_voice_answer(text):
+def create_voice_answer(text,device="cuda"):
     speaker_wav = "няру.wav"
     output_path = "output.wav"
 
     try:
+        tts.to(device)
         tts.tts_to_file(
             text=text,
             speaker_wav=speaker_wav,
@@ -36,3 +37,4 @@ def create_voice_answer(text):
     except Exception as e:
         print(f"❌ Ошибка генерации речи: {e}")
         return None
+# create_voice_answer('любая хуйня')
