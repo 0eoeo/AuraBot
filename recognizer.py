@@ -90,6 +90,15 @@ async def recognize(request: Request, background_tasks: BackgroundTasks):
         cleanup([pcm_path, wav_path])
         return '', 204
 
+    # Приводим текст к нижнему регистру для проверки
+    lower_text = text.lower()
+
+    # Проверяем, содержит ли текст блок-фразы
+    if any(phrase in lower_text for phrase in blocked_phrases):
+        print("🚫 Найдена блок-фраза. Контекст и ответ не будут обновлены.")
+        cleanup([pcm_path, wav_path])
+        return '', 204
+
     # Добавляем контекст
     giga_chat_context.append_context(text)
 
@@ -104,8 +113,6 @@ async def recognize(request: Request, background_tasks: BackgroundTasks):
 
     if output_path:
         background_tasks.add_task(cleanup, [pcm_path, wav_path, output_path])
-
-        # Отправляем аудиофайл
         return FileResponse(output_path, media_type="audio/wav", filename="response.wav")
     else:
         cleanup([pcm_path, wav_path])
