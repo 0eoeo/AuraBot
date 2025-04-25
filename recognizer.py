@@ -1,14 +1,15 @@
 import os
 import torch
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Request
+from fastapi.responses import FileResponse
 from pydub import AudioSegment
 import tempfile
 import whisper
 from dotenv import load_dotenv
-from TTS.api import TTS
 import base64
 
 from voice import create_voice_answer
+from generate_answer import BotState
 
 # Загрузка переменных окружения из .env
 load_dotenv()
@@ -25,6 +26,8 @@ blocked_phrases = [
     "динамичная музыка", "редактор субтитров", "сильный шум",
     "без звука", "музыкальная заставка", "ах ах ах"
 ]
+
+giga_chat_context = BotState()
 
 # Функция для декодирования имени говорящего
 def decode_speaker_name(encoded_name):
@@ -49,7 +52,7 @@ async def recognize(request: Request, background_tasks: BackgroundTasks):
     speaker = decode_speaker_name(speaker_b64) if speaker_b64 else "Бро"
 
     print(f"📥 Получен запрос на распознавание от {speaker}")
-    audio_data = await request.body()  # асинхронно получаем тело запроса
+    audio_data = await request.body()
     if not audio_data:
         raise HTTPException(status_code=400, detail="No audio data provided")
 
@@ -85,3 +88,25 @@ async def recognize(request: Request, background_tasks: BackgroundTasks):
 
     if not text:
         cleanup([pcm_path, wav_path])
+        return '', 204
+
+    # Добавляем контекст
+    giga_chat_context.append_context(text)
+
+    # Получаем ответ от бота
+    response_text = giga_chat_context.get_response_text()
+    if not response_text:
+        cleanup([pcm_path, wav_path])
+        raise HTTPException(status_code=500, detail="Ошибка при получении ответа от бота")
+
+    # Генерация голосового ответа
+    output_path = create_voice_answer(response_text, device=device)
+
+    if output_path:
+        background_tasks.add_task(cleanup, [pcm_path, wav_path, output_path])
+
+        # Отправляем аудиофайл
+        return FileResponse(output_path, media_type="audio/wav", filename="response.wav")
+    else:
+        cleanup([pcm_path, wav_path])
+        raise HTTPException(status_code=500, detail="Ошибка при создании аудиофайла ответа")
