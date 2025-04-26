@@ -11,11 +11,9 @@ const {
 const prism = require('prism-media');
 const fs = require('fs');
 const axios = require('axios');
-const path = require('path');
 const ytdl = require('ytdl-core');
 const ffmpeg = require('ffmpeg-static');
 const { spawn } = require('child_process');
-const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
