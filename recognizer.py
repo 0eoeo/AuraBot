@@ -1,8 +1,10 @@
 import os
 import torch
 import numpy as np
+import scipy.signal
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Request
 from fastapi.responses import FileResponse
+import tempfile
 import whisper
 from dotenv import load_dotenv
 import base64
@@ -26,22 +28,20 @@ model = whisper.load_model("tiny", device=device)
 executor = concurrent.futures.ThreadPoolExecutor()
 
 # Заблокированные фразы
-blocked_phrases = {
+blocked_phrases = set([
     "динамичная музыка", "редактор субтитров", "сильный шум",
     "без звука", "музыкальная заставка", "ах ах ах",
     "аплодисменты", "ух ух ух", "ха ха ха", "смех"
-}
+])
 
 # Контекст GigaChat
 giga_chat_context = BotState()
-
 
 def decode_speaker_name(encoded_name: str) -> str:
     try:
         return base64.b64decode(encoded_name).decode("utf-8")
     except Exception:
         return "Бро"
-
 
 def cleanup(paths):
     for path in paths:
@@ -52,50 +52,55 @@ def cleanup(paths):
         except Exception as e:
             print(f"⚠️ Не удалось удалить {path}: {e}")
 
-
 async def transcribe_audio(model, audio_np: np.ndarray):
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(executor, lambda: model.transcribe(audio_np, language="ru"))
 
+def preprocess_audio(audio_data: bytes) -> np.ndarray:
+    try:
+        # Декодируем int16 PCM -> float32
+        audio_np = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32) / 32768.0
+
+        # Проверяем стерео/моно
+        if len(audio_np) % 2 == 0:
+            audio_np = audio_np.reshape(-1, 2).mean(axis=1)  # Стерео -> Моно
+        else:
+            print("⚠️ Аудио длина не кратна 2 — предполагаем моно")
+
+        # Ресемплинг 48000 Hz -> 16000 Hz
+        audio_np = scipy.signal.resample_poly(audio_np, up=1, down=3)
+
+        return audio_np
+    except Exception as e:
+        print(f"❌ Ошибка преобразования аудио: {e}")
+        raise
 
 @app.post("/recognize")
 async def recognize(request: Request, background_tasks: BackgroundTasks):
-    # Декодирование имени спикера
     speaker_b64 = request.headers.get("X-Speaker-Name")
     speaker = decode_speaker_name(speaker_b64) if speaker_b64 else "Бро"
 
     print(f"📥 Получен запрос на распознавание от {speaker}")
 
-    # Чтение тела запроса
     audio_data = await request.body()
     if not audio_data:
         raise HTTPException(status_code=400, detail="No audio data provided")
 
-    # Проверка минимальной длины аудиофайла (примерно 0.5 секунды)
-    min_pcm_bytes = int(48000 * 2 * 2 * 0.5)
+    # Проверка на минимальную длину аудиоданных (~0.5 секунды)
+    min_pcm_bytes = int(48000 * 2 * 2 * 0.5)  # 48000 samples/sec * 2 bytes/sample * 2 channels * 0.5 sec
     if len(audio_data) < min_pcm_bytes:
         print("⚠️ Аудио слишком короткое. Пропускаем.")
         return '', 204
 
-    def ensure_minimum_length(audio, min_length_samples=16000):
-        if len(audio) < min_length_samples:
-            padding = np.zeros(min_length_samples - len(audio), dtype=audio.dtype)
-            audio = np.concatenate([audio, padding])
-        return audio
-
-    # Конвертация raw PCM -> numpy
+    # Преобразование аудио
     try:
-        audio_np = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32) / 32768.0
-        if len(audio_np) < 16000:  # хотя бы 1 секунда после downsample
-            print("⚠️ Аудио слишком короткое для обработки Whisper.")
-            return '', 204
-        audio_np = audio_np.reshape(-1, 2).mean(axis=1)  # Стерео в моно
+        audio_np = preprocess_audio(audio_data)
     except Exception as e:
         print(f"❌ Ошибка обработки аудио: {e}")
-        raise HTTPException(status_code=400, detail="Некорректный аудиоформат")
-    # Распознавание речи
+        raise HTTPException(status_code=400, detail="Ошибка обработки аудио")
+
+    # Асинхронное распознавание
     try:
-        audio_np = ensure_minimum_length(audio_np)
         result = await transcribe_audio(model, audio_np)
     except Exception as e:
         print(f"❌ Ошибка распознавания: {e}")
@@ -115,12 +120,11 @@ async def recognize(request: Request, background_tasks: BackgroundTasks):
         print("🚫 Найдена блок-фраза. Контекст и ответ не будут обновлены.")
         return '', 204
 
-    # Проверяем, есть ли в тексте слово "зани"
     if "зани" not in lower_text:
-        print("🤫 В тексте нет слова 'зани'. Ответ не требуется.")
+        print("🔎 Обращение 'Зани' не найдено. Ответ не требуется.")
         return '', 204
 
-    # Обновление контекста
+    # Добавляем текст в контекст
     giga_chat_context.append_context(full_text)
 
     # Получаем ответ от GigaChat
