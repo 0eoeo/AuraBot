@@ -19,7 +19,7 @@ require('dotenv').config();
 
 const token = process.env.BOT_TOKEN;
 const COOKIE_STRING = 'PREF=...; VISITOR_INFO1_LIVE=...; YSC=...; SID=...; HSID=...; SSID=...; APISID=...; SAPISID=...; LOGIN_INFO=...';
-const SILENCE_TIMEOUT = 5000;
+const SILENCE_TIMEOUT = 2000;
 const RECORDINGS_DIR = './recordings';
 const queue = new Map(); // Очередь воспроизведения для каждого канала
 
