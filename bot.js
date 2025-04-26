@@ -116,7 +116,7 @@ client.on('messageCreate', async message => {
 
     if (message.content.startsWith('!play ')) {
         const url = message.content.split(' ')[1];
-        if (!ytdl.validateURL(url)) {
+        if (!url || !ytdl.validateURL(url)) {
             return message.reply('❗ Невалидная ссылка на YouTube!');
         }
 
