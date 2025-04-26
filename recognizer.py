@@ -77,16 +77,25 @@ async def recognize(request: Request, background_tasks: BackgroundTasks):
         print("⚠️ Аудио слишком короткое. Пропускаем.")
         return '', 204
 
+    def ensure_minimum_length(audio, min_length_samples=16000):
+        if len(audio) < min_length_samples:
+            padding = np.zeros(min_length_samples - len(audio), dtype=audio.dtype)
+            audio = np.concatenate([audio, padding])
+        return audio
+
     # Конвертация raw PCM -> numpy
     try:
         audio_np = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32) / 32768.0
+        if len(audio_np) < 16000:  # хотя бы 1 секунда после downsample
+            print("⚠️ Аудио слишком короткое для обработки Whisper.")
+            return '', 204
         audio_np = audio_np.reshape(-1, 2).mean(axis=1)  # Стерео в моно
     except Exception as e:
         print(f"❌ Ошибка обработки аудио: {e}")
         raise HTTPException(status_code=400, detail="Некорректный аудиоформат")
-
     # Распознавание речи
     try:
+        audio_np = ensure_minimum_length(audio_np)
         result = await transcribe_audio(model, audio_np)
     except Exception as e:
         print(f"❌ Ошибка распознавания: {e}")
@@ -106,20 +115,24 @@ async def recognize(request: Request, background_tasks: BackgroundTasks):
         print("🚫 Найдена блок-фраза. Контекст и ответ не будут обновлены.")
         return '', 204
 
+    # Проверяем, есть ли в тексте слово "зани"
+    if "зани" not in lower_text:
+        print("🤫 В тексте нет слова 'зани'. Ответ не требуется.")
+        return '', 204
+
     # Обновление контекста
     giga_chat_context.append_context(full_text)
 
-    # Генерация текста-ответа
+    # Получаем ответ от GigaChat
     response_text = giga_chat_context.get_response_text()
     if not response_text:
         raise HTTPException(status_code=500, detail="Ошибка при получении ответа от бота")
 
     # Генерация голосового ответа
     output_path = await create_voice_answer(response_text)
-    if not output_path:
+
+    if output_path:
+        background_tasks.add_task(cleanup, [output_path])
+        return FileResponse(output_path, media_type="audio/wav", filename="response.wav")
+    else:
         raise HTTPException(status_code=500, detail="Ошибка при создании аудиофайла ответа")
-
-    # Планируем фоновую очистку файлов
-    background_tasks.add_task(cleanup, [output_path])
-
-    return FileResponse(output_path, media_type="audio/wav", filename="response.wav")
