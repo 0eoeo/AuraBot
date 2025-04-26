@@ -19,7 +19,7 @@ require('dotenv').config();
 
 const token = process.env.BOT_TOKEN;
 const COOKIE_STRING = 'PREF=...; VISITOR_INFO1_LIVE=...; YSC=...; SID=...; HSID=...; SSID=...; APISID=...; SAPISID=...; LOGIN_INFO=...';
-const SILENCE_TIMEOUT = 2000;
+const SILENCE_TIMEOUT = 5000;
 const RECORDINGS_DIR = './recordings';
 const queue = new Map(); // Очередь воспроизведения для каждого канала
 
@@ -309,12 +309,24 @@ function startRecording(userId, user, connection) {
 
     opusStream.pipe(pcmStream).pipe(output);
 
+    // Обработчик завершения записи по времени молчания
+    let stopTimeout;
     const stopRecording = () => {
         opusStream.destroy();
         output.end();
+        clearTimeout(stopTimeout);
     };
 
-    setTimeout(stopRecording, SILENCE_TIMEOUT);
+    // Проверяем, если пользователь не говорит некоторое время
+    opusStream.on('data', () => {
+        clearTimeout(stopTimeout); // сбрасываем таймер при получении данных
+        stopTimeout = setTimeout(stopRecording, SILENCE_TIMEOUT); // новый таймер
+    });
+
+    // Прекращаем запись при завершении потока
+    opusStream.on('end', () => {
+        stopRecording();
+    });
 
     output.on('finish', async () => {
         console.log(`📁 Записан файл: ${filepath}`);
