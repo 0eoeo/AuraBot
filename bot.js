@@ -15,13 +15,23 @@ const path = require('path');
 const ytdl = require('ytdl-core');
 const ffmpeg = require('ffmpeg-static');
 const { spawn } = require('child_process');
-
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
+
 const token = process.env.BOT_TOKEN;
 const COOKIE_STRING = 'PREF=...; VISITOR_INFO1_LIVE=...; YSC=...; SID=...; HSID=...; SSID=...; APISID=...; SAPISID=...; LOGIN_INFO=...';
 const SILENCE_TIMEOUT = 5000;
 const RECORDINGS_DIR = './recordings';
 const queue = new Map(); // Очередь воспроизведения для каждого канала
+
+// Путь до папки
+const recordingsDir = path.join(__dirname, 'recordings');
+
+// Проверяем и создаём папку
+if (!fs.existsSync(recordingsDir)) {
+    fs.mkdirSync(recordingsDir, { recursive: true });
+}
 
 const client = new Client({
     intents: [
