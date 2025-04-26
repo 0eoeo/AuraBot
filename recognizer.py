@@ -1,43 +1,47 @@
 import os
 import torch
+import numpy as np
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Request
 from fastapi.responses import FileResponse
-from pydub import AudioSegment
 import tempfile
 import whisper
 from dotenv import load_dotenv
 import base64
+import asyncio
+import concurrent.futures
 
 from voice import create_voice_answer
 from generate_answer import BotState
 
-# Загрузка переменных окружения из .env
+# Загрузка переменных окружения
 load_dotenv()
 
 # Инициализация FastAPI
 app = FastAPI()
 
-# Инициализация модели Whisper для распознавания речи
+# Инициализация модели Whisper
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model = whisper.load_model("tiny", device=device)
 
-# Инициализация переменных
-blocked_phrases = [
+# Пул потоков для тяжёлых задач
+executor = concurrent.futures.ThreadPoolExecutor()
+
+# Заблокированные фразы
+blocked_phrases = set([
     "динамичная музыка", "редактор субтитров", "сильный шум",
     "без звука", "музыкальная заставка", "ах ах ах",
     "аплодисменты", "ух ух ух", "ха ха ха", "смех"
-]
+])
 
+# Контекст GigaChat
 giga_chat_context = BotState()
 
-# Функция для декодирования имени говорящего
-def decode_speaker_name(encoded_name):
+def decode_speaker_name(encoded_name: str) -> str:
     try:
         return base64.b64decode(encoded_name).decode("utf-8")
     except Exception:
         return "Бро"
 
-# Функция для очистки временных файлов
 def cleanup(paths):
     for path in paths:
         try:
@@ -47,74 +51,69 @@ def cleanup(paths):
         except Exception as e:
             print(f"⚠️ Не удалось удалить {path}: {e}")
 
+async def transcribe_audio(model, audio_np: np.ndarray):
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(executor, lambda: model.transcribe(audio_np, language="ru"))
+
 @app.post("/recognize")
 async def recognize(request: Request, background_tasks: BackgroundTasks):
     speaker_b64 = request.headers.get("X-Speaker-Name")
     speaker = decode_speaker_name(speaker_b64) if speaker_b64 else "Бро"
 
     print(f"📥 Получен запрос на распознавание от {speaker}")
+
     audio_data = await request.body()
     if not audio_data:
         raise HTTPException(status_code=400, detail="No audio data provided")
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pcm") as tmp_pcm:
-        pcm_path = tmp_pcm.name
-        tmp_pcm.write(audio_data)
-
-    wav_path = pcm_path + ".wav"
-
-    pcm_audio = AudioSegment.from_file(
-        pcm_path,
-        format="raw",
-        frame_rate=48000,
-        channels=2,
-        sample_width=2
-    )
-    pcm_audio.export(wav_path, format="wav")
-
-    if len(pcm_audio) < 500:
+    # Проверка на длину данных (примерно 0.5 сек)
+    min_pcm_bytes = int(48000 * 2 * 2 * 0.5)  # 48000 samples/sec * 2 bytes/sample * 2 channels * 0.5 sec
+    if len(audio_data) < min_pcm_bytes:
         print("⚠️ Аудио слишком короткое. Пропускаем.")
-        cleanup([pcm_path, wav_path])
         return '', 204
 
-    if not os.path.exists(wav_path):
-        print("❌ WAV-файл не найден после экспорта")
-        cleanup([pcm_path])
-        raise HTTPException(status_code=500, detail="WAV-файл не найден")
+    # Конвертация raw PCM в numpy
+    try:
+        audio_np = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32) / 32768.0
+        audio_np = audio_np.reshape(-1, 2).mean(axis=1)  # стерео в моно
+    except Exception as e:
+        print(f"❌ Ошибка обработки аудио: {e}")
+        raise HTTPException(status_code=400, detail="Некорректный аудиоформат")
 
-    # Распознавание текста
-    result = model.transcribe(wav_path, language="ru")
-    text = f"[{speaker}]: {result.get('text', '').strip()}"
-    print(f"📝 [{speaker}]: {text}")
+    # Асинхронное распознавание
+    try:
+        result = await transcribe_audio(model, audio_np)
+    except Exception as e:
+        print(f"❌ Ошибка распознавания: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка распознавания речи")
 
-    if not text:
-        cleanup([pcm_path, wav_path])
+    recognized_text = result.get('text', '').strip()
+    if not recognized_text:
+        print("⚠️ Результат распознавания пустой.")
         return '', 204
 
-    # Приводим текст к нижнему регистру для проверки
-    lower_text = text.lower()
+    full_text = f"[{speaker}]: {recognized_text}"
+    print(f"📝 {full_text}")
 
-    # Проверяем, содержит ли текст блок-фразы
+    # Проверка на блок-фразы
+    lower_text = full_text.lower()
     if any(phrase in lower_text for phrase in blocked_phrases):
         print("🚫 Найдена блок-фраза. Контекст и ответ не будут обновлены.")
-        cleanup([pcm_path, wav_path])
         return '', 204
 
-    # Добавляем контекст
-    giga_chat_context.append_context(text)
+    # Добавляем текст в контекст
+    giga_chat_context.append_context(full_text)
 
-    # Получаем ответ от бота
+    # Получаем ответ от GigaChat
     response_text = giga_chat_context.get_response_text()
     if not response_text:
-        cleanup([pcm_path, wav_path])
         raise HTTPException(status_code=500, detail="Ошибка при получении ответа от бота")
 
-    # Генерация голосового ответа
+    # Генерируем голосовой ответ
     output_path = create_voice_answer(response_text, device=device)
 
     if output_path:
-        background_tasks.add_task(cleanup, [pcm_path, wav_path, output_path])
+        background_tasks.add_task(cleanup, [output_path])
         return FileResponse(output_path, media_type="audio/wav", filename="response.wav")
     else:
-        cleanup([pcm_path, wav_path])
         raise HTTPException(status_code=500, detail="Ошибка при создании аудиофайла ответа")
