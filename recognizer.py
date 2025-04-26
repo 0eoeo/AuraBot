@@ -10,7 +10,6 @@ import base64
 import concurrent.futures
 from voice import create_voice_answer
 from generate_answer import BotState
-import io
 
 # Загрузка переменных окружения
 load_dotenv()
@@ -66,6 +65,17 @@ async def generate_voice_answer(text: str):
     return None
 
 
+def normalize_audio(audio_np: np.ndarray):
+    # Получаем максимальное абсолютное значение
+    max_val = np.max(np.abs(audio_np))
+
+    # Если максимальное значение больше нуля, нормализуем
+    if max_val > 0:
+        audio_np = audio_np / max_val
+
+    return audio_np
+
+
 # Основной рут для распознавания речи
 @app.post("/recognize")
 async def recognize(request: Request, background_tasks: BackgroundTasks):
@@ -88,6 +98,7 @@ async def recognize(request: Request, background_tasks: BackgroundTasks):
     try:
         audio_np = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32) / 32768.0
         audio_np = audio_np.reshape(-1, 2).mean(axis=1)  # стерео в моно
+        audio_np = normalize_audio(audio_np)
     except Exception as e:
         print(f"❌ Ошибка обработки аудио: {e}")
         raise HTTPException(status_code=400, detail="Некорректный аудиоформат")
