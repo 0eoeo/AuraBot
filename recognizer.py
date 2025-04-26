@@ -3,13 +3,13 @@ import torch
 import numpy as np
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Request
 from fastapi.responses import StreamingResponse
-import asyncio
 import whisper
 from dotenv import load_dotenv
 import base64
 import concurrent.futures
 from voice import create_voice_answer
 from generate_answer import BotState
+from scipy.signal import resample
 
 # Загрузка переменных окружения
 load_dotenv()
@@ -51,10 +51,39 @@ def cleanup(paths):
             print(f"⚠️ Не удалось удалить {path}: {e}")
 
 
+# Нормализация аудио
+def normalize_audio(audio_np: np.ndarray):
+    max_val = np.max(np.abs(audio_np))
+    if max_val > 0:
+        audio_np = audio_np / max_val  # Нормализация в диапазоне от -1 до 1
+    return audio_np
+
+
+# Ресемплинг аудио
+def resample_audio(audio_np: np.ndarray, target_rate: int, current_rate: int):
+    num_samples = round(len(audio_np) * float(target_rate) / current_rate)
+    resampled_audio = resample(audio_np, num_samples)
+    return resampled_audio
+
+
 # Асинхронное распознавание речи
 async def transcribe_audio(model, audio_np: np.ndarray):
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(executor, lambda: model.transcribe(audio_np, language="ru"))
+    # Преобразуем в формат, который воспринимает Whisper
+    audio_np = normalize_audio(audio_np)  # Нормализуем
+    audio_np = audio_np.astype(np.float32)
+
+    # Если аудио с частотой не 16000 Гц, нужно выполнить ресемплинг
+    current_rate = 48000  # Предположим, что изначальная частота дискретизации 48000 Гц
+    target_rate = 16000  # Целевая частота для Whisper
+    if current_rate != target_rate:
+        audio_np = resample_audio(audio_np, target_rate, current_rate)
+
+    # Преобразуем в нужный формат
+    audio_tensor = torch.from_numpy(audio_np).to(device)
+
+    # Используем Whisper для транскрибирования
+    result = model.transcribe(audio_tensor)
+    return result
 
 
 # Генерация голосового ответа
@@ -63,17 +92,6 @@ async def generate_voice_answer(text: str):
     if output_path:
         return output_path
     return None
-
-
-def normalize_audio(audio_np: np.ndarray):
-    # Получаем максимальное абсолютное значение
-    max_val = np.max(np.abs(audio_np))
-
-    # Если максимальное значение больше нуля, нормализуем
-    if max_val > 0:
-        audio_np = audio_np / max_val
-
-    return audio_np
 
 
 # Основной рут для распознавания речи
@@ -96,8 +114,8 @@ async def recognize(request: Request, background_tasks: BackgroundTasks):
 
     # Преобразование raw PCM в numpy
     try:
-        audio_np = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32) / 32768.0
-        audio_np = audio_np.reshape(-1, 2).mean(axis=1)  # стерео в моно
+        audio_np = np.frombuffer(audio_data, dtype=np.int16).astype(np.float32) / 32768.0  # Преобразуем в [-1, 1]
+        audio_np = audio_np.reshape(-1, 2).mean(axis=1)  # Преобразуем стерео в моно
         audio_np = normalize_audio(audio_np)
     except Exception as e:
         print(f"❌ Ошибка обработки аудио: {e}")
