@@ -1,10 +1,9 @@
 import os
 import torch
 import numpy as np
-import scipy.signal
+from scipy.signal import resample_poly
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Request
 from fastapi.responses import FileResponse
-import tempfile
 import whisper
 from dotenv import load_dotenv
 import base64
@@ -68,7 +67,7 @@ def preprocess_audio(audio_data: bytes) -> np.ndarray:
             print("⚠️ Аудио длина не кратна 2 — предполагаем моно")
 
         # Ресемплинг 48000 Hz -> 16000 Hz
-        audio_np = scipy.signal.resample_poly(audio_np, up=1, down=3)
+        audio_np = resample_poly(audio_np, up=1, down=3)
 
         return audio_np
     except Exception as e:
