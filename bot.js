@@ -116,77 +116,77 @@ client.on('messageCreate', async message => {
 
     if (message.content.startsWith('!play ')) {
         const url = message.content.split(' ')[1];
-            if (!ytdl.validateURL(url)) {
-                return message.reply('❗ Невалидная ссылка на YouTube!');
-            }
-
-            const voiceChannel = message.member.voice.channel;
-            if (!voiceChannel) return message.reply('🔇 Ты должен быть в голосовом канале!');
-
-            try {
-                const connection = joinVoiceChannel({
-                    channelId: voiceChannel.id,
-                    guildId: message.guild.id,
-                    adapterCreator: message.guild.voiceAdapterCreator
-                });
-
-                const ytdlpProcess = spawn('yt-dlp', [
-                    '-f', 'bestaudio',
-                    '-o', '-',
-                    url
-                ]);
-
-                const ffmpegProcess = spawn(ffmpeg, [
-                    '-i', 'pipe:0',
-                    '-f', 's16le',
-                    '-ar', '48000',
-                    '-ac', '2',
-                    'pipe:1'
-                ]);
-
-                ytdlpProcess.stdout.pipe(ffmpegProcess.stdin);
-
-                ytdlpProcess.stderr.on('data', data => {
-                    console.error(`yt-dlp error: ${data}`);
-                });
-
-                ytdlpProcess.on('close', code => {
-                    if (code !== 0) {
-                        console.error(`yt-dlp exited with code ${code}`);
-                    }
-                });
-
-                const resource = createAudioResource(ffmpegProcess.stdout, {
-                    inputType: StreamType.Raw
-                });
-
-                const player = createAudioPlayer();
-                connection.subscribe(player);
-                player.play(resource);
-
-                player.on(AudioPlayerStatus.Playing, () => {
-                    console.log('▶️ Музыка проигрывается');
-                    message.reply('🎶 Воспроизвожу музыку!');
-                });
-
-                player.on(AudioPlayerStatus.Idle, () => {
-                    console.log('⏹️ Музыка остановлена');
-                    if (connection.state.status !== 'destroyed') {
-                        connection.destroy();
-                    }
-                });
-
-                player.on('error', error => {
-                    console.error('🎧 Ошибка проигрывания:', error.message);
-                    if (connection.state.status !== 'destroyed') {
-                        connection.destroy();
-                    }
-                });
-            } catch (err) {
-                console.error('❌ Ошибка при воспроизведении:', err.message);
-                message.reply('⚠️ Произошла ошибка при попытке воспроизвести видео');
-            }
+        if (!ytdl.validateURL(url)) {
+            return message.reply('❗ Невалидная ссылка на YouTube!');
         }
+
+        const voiceChannel = message.member.voice.channel;
+        if (!voiceChannel) return message.reply('🔇 Ты должен быть в голосовом канале!');
+
+        try {
+            const connection = joinVoiceChannel({
+                channelId: voiceChannel.id,
+                guildId: message.guild.id,
+                adapterCreator: message.guild.voiceAdapterCreator
+            });
+
+            const ytdlpProcess = spawn('yt-dlp', [
+                '-f', 'bestaudio',
+                '-o', '-',
+                url
+            ]);
+
+            const ffmpegProcess = spawn(ffmpeg, [
+                '-i', 'pipe:0',
+                '-f', 's16le',
+                '-ar', '48000',
+                '-ac', '2',
+                'pipe:1'
+            ]);
+
+            ytdlpProcess.stdout.pipe(ffmpegProcess.stdin);
+
+            ytdlpProcess.stderr.on('data', data => {
+                console.error(`yt-dlp error: ${data}`);
+            });
+
+            ytdlpProcess.on('close', code => {
+                if (code !== 0) {
+                    console.error(`yt-dlp exited with code ${code}`);
+                }
+            });
+
+            const resource = createAudioResource(ffmpegProcess.stdout, {
+                inputType: StreamType.Raw
+            });
+
+            const player = createAudioPlayer();
+            connection.subscribe(player);
+            player.play(resource);
+
+            player.on(AudioPlayerStatus.Playing, () => {
+                console.log('▶️ Музыка проигрывается');
+                message.reply('🎶 Воспроизвожу музыку!');
+            });
+
+            player.on(AudioPlayerStatus.Idle, () => {
+                console.log('⏹️ Музыка остановлена');
+                if (connection.state.status !== 'destroyed') {
+                    connection.destroy();
+                }
+            });
+
+            player.on('error', error => {
+                console.error('🎧 Ошибка проигрывания:', error.message);
+                if (connection.state.status !== 'destroyed') {
+                    connection.destroy();
+                }
+            });
+        } catch (err) {
+            console.error('❌ Ошибка при воспроизведении:', err.message);
+            message.reply('⚠️ Произошла ошибка при попытке воспроизвести видео');
+        }
+    }
 
     if (message.content === '!skip') {
         skipSong(message);
@@ -327,7 +327,7 @@ function startRecording(userId, user, connection) {
             }
 
             const speakerName = Buffer.from(user.displayName, 'utf-8').toString('base64');
-            const res = await axios.post('http://192.168.2.117:5000/recognize', audioData, {
+            const res = await axios.post('http://0.0.0.0:5000/recognize', audioData, {
                 responseType: 'arraybuffer',
                 headers: {
                     'Content-Type': 'application/octet-stream',
