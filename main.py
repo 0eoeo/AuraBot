@@ -1,14 +1,15 @@
 import discord
 from discord.ext import commands
 from audio_recorder import AudioRecorder
-# from recognizer_client import RecognizerClient
-# from tts_generator import TTSGenerator
+from recognizer_client import RecognizerClient
+from tts_generator import TTSGenerator
 from config import BOT_TOKEN
 
-# recognizer = RecognizerClient()
-# tts = TTSGenerator()
+recognizer = RecognizerClient()
+tts = TTSGenerator()
 
 intents = discord.Intents.default()
+intents.message_content = True
 intents.messages = True
 intents.voice_states = True
 intents.guilds = True
@@ -26,19 +27,8 @@ async def on_ready():
 async def on_message(message):
     if message.author.bot:
         return
-
     if message.content.lower() == "!join":
         await audio_recorder.join(message)
-
-@bot.command()
-async def join(ctx):
-    """Команда для подключения к голосовому каналу пользователя."""
-    print('➡ Пытаемся подключиться...')
-    if ctx.author.voice:
-        channel = ctx.author.voice.channel
-        await audio_recorder.join(ctx, channel)
-    else:
-        await ctx.send("❌ Вы не находитесь в голосовом канале!")
 
 @bot.command()
 async def leave(ctx):
