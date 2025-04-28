@@ -279,8 +279,7 @@ function startRecording(userId, user, connection) {
         } catch (err) {
             console.error('❌ Ошибка при обработке аудио:', err.message);
         } finally {
-            setTimeout(() => {
-                setTimeout(async () => {
+            setTimeout(async () => {
                 await fs.promises.unlink(filepath);
                 console.log(`🗑️ Удалён ${filepath}`);
             }, 5000);
