@@ -20,6 +20,8 @@ app = FastAPI()
 # Инициализация модели Whisper
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model = whisper.load_model("tiny", device=device)
+result = whisper.transcribe('няру.wav')
+print('Результат прогрева: ', result["text"])
 
 # Пул потоков для тяжёлых задач
 executor = concurrent.futures.ThreadPoolExecutor()
@@ -28,9 +30,9 @@ executor = concurrent.futures.ThreadPoolExecutor()
 giga_chat_context = BotState()
 
 # Заблокированные фразы
-blocked_phrases = set(["динамичная музыка", "редактор субтитров", "сильный шум",
-                       "без звука", "музыкальная заставка", "ах ах ах", "аплодисменты",
-                       "ух ух ух", "ха ха ха", "смех"])
+blocked_phrases = {"динамичная музыка", "редактор субтитров", "сильный шум",
+                   "без звука", "музыкальная заставка", "ах ах ах", "аплодисменты",
+                   "ух ух ух", "ха ха ха", "смех", "спокойная музыка"}
 
 
 def decode_speaker_name(encoded_name: str) -> str:
