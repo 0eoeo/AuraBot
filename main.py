@@ -1,13 +1,13 @@
 import discord
 from discord.ext import commands
-from recognizer_client import RecognizerClient
-from tts_generator import TTSGenerator
+# from recognizer_client import RecognizerClient
+# from tts_generator import TTSGenerator
 from audio_recorder import AudioRecorder
 from config import BOT_TOKEN
 
 # Инициализация клиентов для распознавания речи и TTS
-recognizer = RecognizerClient()
-tts = TTSGenerator()
+# recognizer = RecognizerClient()
+# tts = TTSGenerator()
 
 # Инициализация бота с нужными интентами
 intents = discord.Intents.default()
@@ -19,7 +19,7 @@ intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # Инициализация AudioRecorder с реальными объектами recognizer и tts
-audio_recorder = AudioRecorder(bot, recognizer, tts)
+audio_recorder = AudioRecorder(bot, '', '')
 
 @bot.event
 async def on_ready():
