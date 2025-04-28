@@ -235,11 +235,12 @@ function startRecording(userId, user, connection) {
         console.log(`📁 Записан файл: ${filepath}`);
 
         try {
-            const audioData = fs.readFileSync(filepath);
-            if (audioData.length === 0) {
+            const audioData = await fs.promises.readFile(filepath);
+            if (audioData.length === 0 || !fs.existsSync(filepath)) {
                 console.warn('⚠️ Пустой аудиофайл — пропускаем');
                 return;
             }
+
 
             const speakerName = Buffer.from(user.displayName, 'utf-8').toString('base64');
             const res = await axios.post('http://0.0.0.0:5000/recognize', audioData, {
@@ -268,10 +269,8 @@ function startRecording(userId, user, connection) {
                 player.once(AudioPlayerStatus.Idle, () => {
                     console.log('✅ Проигрывание завершено');
                     setTimeout(() => {
-                        fs.unlink(outputAudioPath, err => {
-                            if (err) console.error('❌ Ошибка удаления output файла:', err);
-                            else console.log('🗑️ Удалён output файл');
-                        });
+                        await fs.promises.unlink(filepath);
+                        console.log(`🗑️ Удалён ${filepath}`);
                     }, 1000);
                 });
             } else {
@@ -281,10 +280,8 @@ function startRecording(userId, user, connection) {
             console.error('❌ Ошибка при обработке аудио:', err.message);
         } finally {
             setTimeout(() => {
-                fs.unlink(filepath, err => {
-                    if (err) console.error('❌ Ошибка удаления .pcm файла:', err);
-                    else console.log(`🗑️ Удалён ${filepath}`);
-                });
+                await fs.promises.unlink(filepath);
+                console.log(`🗑️ Удалён ${filepath}`);
             }, 5000);
         }
     });

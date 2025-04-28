@@ -1,4 +1,7 @@
+import asyncio
 import os
+import time
+
 import torch
 import numpy as np
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Request
@@ -84,7 +87,7 @@ async def transcribe_audio(model, audio_np: np.ndarray):
     audio_tensor = torch.from_numpy(audio_np).to(device)
 
     # Используем Whisper для транскрибирования
-    result = model.transcribe(audio_tensor)
+    result = model.transcribe(audio_tensor, stream=True, language="ru")
     return result
 
 
@@ -144,11 +147,10 @@ async def recognize(request: Request, background_tasks: BackgroundTasks):
         print("🚫 Найдена блок-фраза. Контекст и ответ не будут обновлены.")
         return '', 204
 
-    # Добавляем текст в контекст
-    giga_chat_context.append_context(full_text)
-
     # Получаем ответ от GigaChat только если в тексте есть ключевые слова или вопрос
     if "зани" in full_text.lower() or "?" in full_text:
+        # Добавляем текст в контекст
+        giga_chat_context.append_context(full_text)
         response_text = giga_chat_context.get_response_text()
         if not response_text:
             cleanup([audio_data])
@@ -172,3 +174,17 @@ async def recognize(request: Request, background_tasks: BackgroundTasks):
     # Если слово "зани" или вопрос не найден, ничего не отвечаем
     print("🔎 Обращение 'Зани' или вопрос не найдено. Ответ не требуется.")
     return '', 204
+
+def listen_for_audio():
+    while True:
+        audio_file = "path_to_audio_file.wav"  # Это должен быть путь к новому файлу, который появляется
+        if os.path.exists(audio_file):
+            print(f"Обработка аудиофайла: {audio_file}")
+            text = transcribe_audio(audio_file)
+            print(f"Распознанный текст: {text}")
+            # Удаление файла после обработки
+            os.remove(audio_file)
+        time.sleep(1)  # Пауза между проверками наличия нового файла
+
+if __name__ == "__main__":
+    asyncio.run(listen_for_audio())
