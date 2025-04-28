@@ -6,25 +6,12 @@ import generate_answer
 
 
 class AudioRecorder(discord.Client):
-    def __init__(self, voice_channel_id, recognizer, tts, **options):
+    def __init__(self, recognizer, tts, **options):
         super().__init__(**options)
-        self.voice_channel_id = voice_channel_id
         self.recognizer = recognizer
         self.tts = tts
         self.player = None
         self.gigachat = generate_answer.BotState()
-
-    async def on_ready(self):
-        print(f"✅ Logged in as {self.user} (ID: {self.user.id})")
-        voice_channel = self.get_channel(self.voice_channel_id)
-        if voice_channel:
-            if isinstance(voice_channel, discord.VoiceChannel):
-                vc = await voice_channel.connect()
-                self.player = vc
-                print(f"🎤 Connected to voice channel: {voice_channel.name}")
-                await self.listen_and_respond(vc)
-            else:
-                print("❌ Нельзя подключиться: это не голосовой канал!")
 
     async def join_and_listen(self, message: discord.Message):
         if message.author.voice and message.author.voice.channel:
