@@ -11,16 +11,27 @@ class AudioRecorder(discord.Client):
         self.recognizer = recognizer
         self.tts = tts
         self.player = None
+        self.voice_client = None
         self.gigachat = generate_answer.BotState()
 
-    async def join_and_listen(self, message: discord.Message):
-        if message.author.voice and message.author.voice.channel:
-            channel = message.author.voice.channel
-            vc = await channel.connect()
-            print(f"🔊 Подключился к {channel.name}")
-            await self.listen_and_respond(vc)
+    async def join(self, ctx, channel):
+        """Присоединение к голосовому каналу."""
+        if self.voice_client is not None:
+            await ctx.send(f"Я уже подключен к каналу {self.voice_client.channel.name}.")
+            return
+
+        # Подключаемся к голосовому каналу
+        self.voice_client = await channel.connect()
+        await ctx.send(f"🔊 Подключился к каналу {channel.name}.")
+
+    async def leave(self, ctx):
+        """Выход из голосового канала."""
+        if self.voice_client is not None:
+            await self.voice_client.disconnect()
+            self.voice_client = None
+            await ctx.send("👋 Отошел от голосового канала.")
         else:
-            await message.channel.send("Ты не в голосовом канале!")
+            await ctx.send("❌ Я не подключен к голосовому каналу.")
 
     async def listen_and_respond(self, vc):
         while True:
