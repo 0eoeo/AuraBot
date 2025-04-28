@@ -268,7 +268,7 @@ function startRecording(userId, user, connection) {
 
                 player.once(AudioPlayerStatus.Idle, () => {
                     console.log('✅ Проигрывание завершено');
-                    setTimeout(() => {
+                    setTimeout(async () => {
                         await fs.promises.unlink(filepath);
                         console.log(`🗑️ Удалён ${filepath}`);
                     }, 1000);
@@ -280,6 +280,7 @@ function startRecording(userId, user, connection) {
             console.error('❌ Ошибка при обработке аудио:', err.message);
         } finally {
             setTimeout(() => {
+                setTimeout(async () => {
                 await fs.promises.unlink(filepath);
                 console.log(`🗑️ Удалён ${filepath}`);
             }, 5000);
