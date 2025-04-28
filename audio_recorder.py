@@ -15,15 +15,17 @@ class AudioRecorder(discord.Client):
         self.voice_client = None
         self.gigachat = generate_answer.BotState()
 
-    async def join(self, ctx, channel):
+    async def join(self, message):
         """Присоединение к голосовому каналу."""
-        if self.voice_client is not None:
-            await ctx.send(f"Я уже подключен к каналу {self.voice_client.channel.name}.")
+        if not message.author.voice:
+            await message.channel.send("⚠️ Ты не в голосовом канале!")
             return
 
-        # Подключаемся к голосовому каналу
-        self.voice_client = await channel.connect()
-        await ctx.send(f"🔊 Подключился к каналу {channel.name}.")
+        channel = message.author.voice.channel
+        vc = await channel.connect()
+        await message.channel.send(f"🔊 Подключился к {channel.name}")
+
+        await self.listen_and_respond(vc)
 
     async def leave(self, ctx):
         """Выход из голосового канала."""

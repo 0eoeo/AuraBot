@@ -22,6 +22,14 @@ audio_recorder = AudioRecorder(bot, recognizer, tts)
 async def on_ready():
     print(f"✅ Бот запущен как {bot.user}")
 
+@bot.event
+async def on_message(message):
+    if message.author.bot:
+        return
+
+    if message.content.lower() == "!join":
+        await audio_recorder.join(message)
+
 @bot.command()
 async def join(ctx):
     """Команда для подключения к голосовому каналу пользователя."""
