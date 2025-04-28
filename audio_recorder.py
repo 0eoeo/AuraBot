@@ -6,8 +6,9 @@ import generate_answer
 
 
 class AudioRecorder(discord.Client):
-    def __init__(self, recognizer, tts, **options):
+    def __init__(self,  bot, recognizer, tts, **options):
         super().__init__(**options)
+        self.bot = bot
         self.recognizer = recognizer
         self.tts = tts
         self.player = None
