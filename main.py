@@ -29,11 +29,14 @@ async def on_ready():
 async def join(ctx):
     """Команда для присоединения к голосовому каналу, где находится пользователь."""
     print('Запуск join...')
-    if ctx.author.voice:
-        channel = ctx.author.voice.channel  # Получаем голосовой канал, в котором находится пользователь
-        await audio_recorder.join(ctx, channel)  # Передаем канал в метод join
-    else:
-        await ctx.send("❌ Вы не находитесь в голосовом канале!")
+    try:
+        if ctx.author.voice:
+            channel = ctx.author.voice.channel  # Получаем голосовой канал, в котором находится пользователь
+            await audio_recorder.join(ctx, channel)  # Передаем канал в метод join
+        else:
+            await ctx.send("❌ Вы не находитесь в голосовом канале!")
+    except Exception as e:
+        print(e)
 
 @bot.command()
 async def leave(ctx):
