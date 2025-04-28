@@ -1,13 +1,7 @@
-import os
-
 from langchain.schema import HumanMessage, SystemMessage
 from langchain_community.chat_models.gigachat import GigaChat
 
-from dotenv import load_dotenv
-
-load_dotenv()
-
-GIGACHAT_TOKEN = os.getenv('GIGACHAT_TOKEN')
+from config import GIGACHAT_TOKEN
 
 class BotState:
     def __init__(self):
