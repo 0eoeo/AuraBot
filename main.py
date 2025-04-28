@@ -1,12 +1,12 @@
 import discord
 from discord.ext import commands
 from audio_recorder import AudioRecorder
-from recognizer_client import RecognizerClient
-from tts_generator import TTSGenerator
+# from recognizer_client import RecognizerClient
+# from tts_generator import TTSGenerator
 from config import BOT_TOKEN
 
-recognizer = RecognizerClient()
-tts = TTSGenerator()
+# recognizer = RecognizerClient()
+# tts = TTSGenerator()
 
 intents = discord.Intents.default()
 intents.messages = True
@@ -16,7 +16,7 @@ intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-audio_recorder = AudioRecorder(bot, recognizer, tts)
+audio_recorder = AudioRecorder(bot, 'recognizer', 'tts')
 
 @bot.event
 async def on_ready():
