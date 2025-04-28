@@ -55,62 +55,6 @@ client.once('ready', () => {
     console.log(`🔊 Logged in as ${client.user.tag}`);
 });
 
-// Функция для добавления музыки в очередь
-async function addToQueue(message, url) {
-    const serverQueue = queue.get(message.guild.id);
-    const voiceChannel = message.member.voice.channel;
-
-    if (!voiceChannel) {
-        return message.reply('🔇 Ты должен быть в голосовом канале!');
-    }
-
-    // 🛡️ Проверка URL
-    if (!ytdl.validateURL(url)) {
-        return message.reply('❗ Указана некорректная YouTube ссылка.');
-    }
-
-    try {
-        const songInfo = await ytdl.getInfo(url);
-        const song = {
-            title: songInfo.videoDetails.title,
-            url: songInfo.videoDetails.video_url,
-            stream: ytdl(url, { filter: 'audioonly' })
-        };
-
-        if (!serverQueue) {
-            const queueConstruct = {
-                textChannel: message.channel,
-                voiceChannel: voiceChannel,
-                connection: null,
-                player: createAudioPlayer(),
-                songs: []
-            };
-            queue.set(message.guild.id, queueConstruct);
-
-            queueConstruct.songs.push(song);
-            try {
-                const connection = await joinVoiceChannel({
-                    channelId: voiceChannel.id,
-                    guildId: message.guild.id,
-                    adapterCreator: message.guild.voiceAdapterCreator
-                });
-                queueConstruct.connection = connection;
-                play(message.guild, queueConstruct.songs[0]);
-            } catch (err) {
-                console.error('❌ Ошибка подключения:', err);
-                queue.delete(message.guild.id);
-                return message.reply('❗ Не удалось подключиться к голосовому каналу.');
-            }
-        } else {
-            serverQueue.songs.push(song);
-            return message.reply(`🎶 Добавлено в очередь: ${song.title}`);
-        }
-    } catch (error) {
-        console.error('❌ Ошибка получения информации о видео:', error);
-        return message.reply('❗ Произошла ошибка при добавлении песни в очередь.');
-    }
-}
-
 client.on('messageCreate', async message => {
     if (message.author.bot) return;
 
@@ -233,43 +177,6 @@ client.on('messageCreate', async message => {
     }
 });
 
-// Функция для проигрывания песен из очереди
-function play(guild, song) {
-    const serverQueue = queue.get(guild.id);
-
-    if (!song) {
-        serverQueue.connection.destroy();
-        queue.delete(guild.id);
-        return;
-    }
-
-    const resource = createAudioResource(song.stream, {
-        inputType: StreamType.Arbitrary,
-        metadata: { title: song.title }
-    });
-
-    serverQueue.player.play(resource);
-
-    serverQueue.connection.subscribe(serverQueue.player);
-
-    serverQueue.player.on(AudioPlayerStatus.Playing, () => {
-        console.log(`▶️ Воспроизведение: ${song.title}`);
-        serverQueue.textChannel.send(`🎶 Сейчас играет: ${song.title}`);
-    });
-
-    serverQueue.player.on(AudioPlayerStatus.Idle, () => {
-        serverQueue.songs.shift();
-        play(guild, serverQueue.songs[0]);
-    });
-
-    serverQueue.player.on('error', (error) => {
-        console.error('🎧 Ошибка проигрывания:', error);
-        serverQueue.songs.shift();
-        play(guild, serverQueue.songs[0]);
-    });
-}
-
-// Функция для пропуска текущей песни
 function skipSong(message) {
     const serverQueue = queue.get(message.guild.id);
     if (!serverQueue) {
@@ -279,7 +186,6 @@ function skipSong(message) {
     message.reply('⏩ Песня пропущена!');
 }
 
-// Функция для остановки музыки
 function stopMusic(message) {
     const serverQueue = queue.get(message.guild.id);
     if (!serverQueue) {
@@ -309,7 +215,6 @@ function startRecording(userId, user, connection) {
 
     opusStream.pipe(pcmStream).pipe(output);
 
-    // Обработчик завершения записи по времени молчания
     let stopTimeout;
     const stopRecording = () => {
         opusStream.destroy();
@@ -317,13 +222,11 @@ function startRecording(userId, user, connection) {
         clearTimeout(stopTimeout);
     };
 
-    // Проверяем, если пользователь не говорит некоторое время
     opusStream.on('data', () => {
-        clearTimeout(stopTimeout); // сбрасываем таймер при получении данных
-        stopTimeout = setTimeout(stopRecording, SILENCE_TIMEOUT); // новый таймер
+        clearTimeout(stopTimeout);
+        stopTimeout = setTimeout(stopRecording, SILENCE_TIMEOUT);
     });
 
-    // Прекращаем запись при завершении потока
     opusStream.on('end', () => {
         stopRecording();
     });
@@ -380,16 +283,9 @@ function startRecording(userId, user, connection) {
             setTimeout(() => {
                 fs.unlink(filepath, err => {
                     if (err) console.error('❌ Ошибка удаления .pcm файла:', err);
-                    else console.log('🗑️ Удалён .pcm файл');
+                    else console.log(`🗑️ Удалён ${filepath}`);
                 });
-            }, 1000);
-
-            recordingInProgress.delete(userId);
-
-            // Повторная проверка: говорит ли пользователь ещё
-            if (receiver.speaking.users.has(userId) && canStartNewRecording(userId)) {
-                startRecording(userId, user, connection);
-            }
+            }, 5000);
         }
     });
 }
