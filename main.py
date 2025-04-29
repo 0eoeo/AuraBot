@@ -19,19 +19,18 @@ class AudioRequest(BaseModel):
 
 def create_voice_answer_stream(text: str):
     """
-    Эта функция генерирует WAV-файл с синусоидальным сигналом,
-    имитируя аудиоответ. В реальной реализации замените эту часть на
-    вызов вашей TTS-системы.
+    Функция генерирует аудио (WAV) с синусоидальным сигналом в качестве примера.
+    Замените эту часть на вызов вашей TTS-системы.
     """
     sample_rate = 16000
     duration = 1.0  # длительность аудио в секундах
-    frequency = 440.0  # частота в Гц
+    frequency = 440.0  # частота сигнала в Гц
 
     # Генерируем синусоидальный сигнал
     t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
     audio_data = 0.5 * np.sin(2 * np.pi * frequency * t)
 
-    # Конвертируем в 16-битный PCM
+    # Преобразуем в 16-битный PCM
     audio_int16 = (audio_data * 32767).astype(np.int16)
 
     # Записываем аудио в формат WAV в буфер

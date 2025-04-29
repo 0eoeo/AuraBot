@@ -32,10 +32,16 @@ client.on('messageCreate', async message => {
     if (!voiceChannel)
       return message.reply('Ты должен быть в голосовом канале!');
 
+    // Создаем соединение с голосовым каналом
     const connection = joinVoiceChannel({
       channelId: voiceChannel.id,
       guildId: message.guild.id,
       adapterCreator: message.guild.voiceAdapterCreator
+    });
+
+    // Добавляем обработчик ошибок на VoiceConnection, чтобы избежать неотловленных ошибок
+    connection.on('error', error => {
+      console.error('VoiceConnection error:', error);
     });
 
     const receiver = connection.receiver;
@@ -64,7 +70,7 @@ client.on('messageCreate', async message => {
       pcmStream.on('end', async () => {
         const buffer = Buffer.concat(chunks);
 
-        // Конвертируем PCM Buffer в Float32Array (значения в диапазоне -1 .. 1)
+        // Преобразуем PCM Buffer в Float32Array (значения от -1 до 1)
         const float32Array = new Float32Array(buffer.length / 2);
         for (let i = 0; i < buffer.length; i += 2) {
           const int16 = buffer.readInt16LE(i);
