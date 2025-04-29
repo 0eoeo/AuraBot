@@ -22,7 +22,6 @@ async def recognize(req: AudioRequest):
     speaker = req.speaker
     audio_np = np.array(req.audio, dtype=np.float32)
 
-    # Распознавание речи
     result = model.transcribe(audio_np)
     text = result.get("text", "").strip()
     if not text:
@@ -33,9 +32,8 @@ async def recognize(req: AudioRequest):
     if not response:
         return StreamingResponse(iter([]), media_type="audio/wav")
 
-    # Озвучка и потоковая передача
-    async def audio_stream() -> AsyncGenerator[bytes, None]:
-        async for chunk in create_voice_answer_stream(response):
-            yield chunk
+    return StreamingResponse(
+        create_voice_answer_stream(response),
+        media_type="audio/wav"
+    )
 
-    return StreamingResponse(audio_stream(), media_type="audio/wav")
