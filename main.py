@@ -13,30 +13,28 @@ bot_state = BotState()
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model = whisper.load_model("tiny", device=device)
 
-
 class AudioRequest(BaseModel):
     speaker: str
     audio: list[float]  # PCM в формате float32
 
-
 def create_voice_answer_stream(text: str):
     """
-    Функция для генерации аудио (WAV) в виде потока.
-    Здесь в качестве примера сгенерирован тон (синусоида).
-    В реальной реализации замените этот блок на вызов вашей TTS-системы.
+    Эта функция генерирует WAV-файл с синусоидальным сигналом,
+    имитируя аудиоответ. В реальной реализации замените эту часть на
+    вызов вашей TTS-системы.
     """
     sample_rate = 16000
     duration = 1.0  # длительность аудио в секундах
-    frequency = 440.0  # частота тона в Гц (например, 440 Гц)
+    frequency = 440.0  # частота в Гц
 
     # Генерируем синусоидальный сигнал
     t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
     audio_data = 0.5 * np.sin(2 * np.pi * frequency * t)
 
-    # Преобразуем в 16-битный PCM
+    # Конвертируем в 16-битный PCM
     audio_int16 = (audio_data * 32767).astype(np.int16)
 
-    # Записываем аудио данные в формат WAV в буфер
+    # Записываем аудио в формат WAV в буфер
     buffer = io.BytesIO()
     with wave.open(buffer, 'wb') as wav_file:
         wav_file.setnchannels(1)
@@ -45,7 +43,7 @@ def create_voice_answer_stream(text: str):
         wav_file.writeframes(audio_int16.tobytes())
     buffer.seek(0)
 
-    # Читаем и отдаём аудио чанками (каждый размером до 8192 байт)
+    # Читаем аудио чанками по 8192 байта
     chunk_size = 8192
     while True:
         chunk = buffer.read(chunk_size)
@@ -53,17 +51,14 @@ def create_voice_answer_stream(text: str):
             break
         yield chunk
 
-
 @app.post("/recognize")
 async def recognize(req: AudioRequest):
     speaker = req.speaker
-    # Преобразуем полученный список чисел в numpy-массив
     audio_np = np.array(req.audio, dtype=np.float32)
 
     result = model.transcribe(audio_np, language="ru")
     text = result.get("text", "").strip()
     if not text:
-        # Если распознование ничего не дало, возвращаем пустой поток
         return StreamingResponse(iter([]), media_type="audio/wav")
 
     await bot_state.append_context(f"{speaker}: {text}")
@@ -71,7 +66,6 @@ async def recognize(req: AudioRequest):
     if not response_text:
         return StreamingResponse(iter([]), media_type="audio/wav")
 
-    # Возвращаем StreamingResponse, который гарантированно отдает байтовые чанки
     return StreamingResponse(
         create_voice_answer_stream(response_text),
         media_type="audio/wav"
