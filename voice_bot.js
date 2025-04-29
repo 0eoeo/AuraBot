@@ -20,9 +20,6 @@ const client = new Client({
     ]
 });
 
-const lastReplyTimestamps = new Map(); // userId -> timestamp
-const MIN_INTERVAL_MS = 5000; // 5 секунд между ответами
-
 client.once('ready', () => {
     console.log(`🔊 Logged in as ${client.user.tag}`);
 });
@@ -45,14 +42,6 @@ client.on('messageCreate', async message => {
         receiver.speaking.on('start', userId => {
             const user = message.guild.members.cache.get(userId);
             if (user?.user?.bot) return;
-
-            const now = Date.now();
-            const lastTime = lastReplyTimestamps.get(userId) || 0;
-            if (now - lastTime < MIN_INTERVAL_MS) {
-                console.log(`⏳ Пропускаем генерацию для ${user.displayName}`);
-                return;
-            }
-            lastReplyTimestamps.set(userId, now);
 
             const opusStream = receiver.subscribe(userId, {
                 end: { behavior: EndBehaviorType.AfterSilence, duration: 1000 }
@@ -98,12 +87,23 @@ client.on('messageCreate', async message => {
                     connection.subscribe(player);
 
                     const audioChunks = [];
-                    response.data.on('data', chunk => audioChunks.push(chunk));
+                    response.data.on('data', chunk => {
+                        audioChunks.push(chunk);
+                    });
 
                     response.data.on('end', () => {
                         const audioBuffer = Buffer.concat(audioChunks);
-                        const resource = createAudioResource(audioBuffer, { inputType: StreamType.Arbitrary });
-                        player.play(resource);
+                        if (!audioBuffer || audioBuffer.length === 0) {
+                            console.error('❌ Ошибка: пустой аудиофайл');
+                            return;
+                        }
+
+                        try {
+                            const resource = createAudioResource(audioBuffer, { inputType: StreamType.Arbitrary });
+                            player.play(resource);
+                        } catch (error) {
+                            console.error('❌ Ошибка при создании ресурса для проигрывания:', error.message);
+                        }
                     });
 
                     player.on(AudioPlayerStatus.Idle, () => {
