@@ -1,8 +1,8 @@
 import os
-import torch
 import uuid
 from typing import AsyncGenerator
 from TTS.api import TTS
+import torch
 from TTS.tts.configs.xtts_config import XttsConfig, XttsAudioConfig
 from TTS.config.shared_configs import BaseDatasetConfig
 from TTS.tts.models.xtts import XttsArgs
@@ -12,9 +12,7 @@ tts = TTS(model_name="tts_models/multilingual/multi-dataset/xtts_v2")
 tts.to(device)
 
 speaker_wav = "няру.wav"
-
 torch.serialization.add_safe_globals([XttsConfig, XttsAudioConfig, BaseDatasetConfig, XttsArgs])
-
 
 # Генерация речи и запись в файл
 def generate_voice_sync(text: str, output_path: str):
@@ -24,7 +22,6 @@ def generate_voice_sync(text: str, output_path: str):
         language="ru",
         file_path=output_path
     )
-
 
 async def create_voice_answer_stream(text: str) -> AsyncGenerator[bytes, None]:
     output_filename = f"{uuid.uuid4().hex}.wav"
