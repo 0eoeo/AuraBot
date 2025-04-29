@@ -63,13 +63,20 @@ client.on('messageCreate', async message => {
             pcmStream.on('end', async () => {
                 const buffer = Buffer.concat(chunks);
 
+                // Преобразуем PCM Buffer в Float32
+                const float32Array = new Float32Array(buffer.length / 2);
+                for (let i = 0; i < buffer.length; i += 2) {
+                    const int16 = buffer.readInt16LE(i);
+                    float32Array[i / 2] = int16 / 32768;
+                }
+
                 const payload = {
                     speaker: user.displayName,
-                    audio: buffer // передаем сырое аудио как Buffer
+                    audio: Array.from(float32Array)
                 };
 
                 try {
-                    const response = await axios.post('http://localhost:8000/recognize', payload, {
+                    const response = await axios.post('http://localhost:5000/recognize', payload, {
                         responseType: 'stream',
                         headers: {
                             'Content-Type': 'application/json'
@@ -80,23 +87,22 @@ client.on('messageCreate', async message => {
                     connection.subscribe(player);
 
                     const chunks = [];
-                    response.data.on('data', chunk => {
-                        chunks.push(chunk);
-                    });
+                    response.data.on('data', chunk => chunks.push(chunk));
 
                     response.data.on('end', () => {
                         const audioBuffer = Buffer.concat(chunks);
                         const resource = createAudioResource(audioBuffer, { inputType: StreamType.Arbitrary });
                         player.play(resource);
-
-                        player.on(AudioPlayerStatus.Idle, () => {
-                            console.log('🔊 Проигрывание завершено');
-                        });
-
-                        player.on('error', error => {
-                            console.error('🎧 Ошибка проигрывания:', error.message);
-                        });
                     });
+
+                    player.on(AudioPlayerStatus.Idle, () => {
+                        console.log('🔊 Проигрывание завершено');
+                    });
+
+                    player.on('error', error => {
+                        console.error('🎧 Ошибка проигрывания:', error.message);
+                    });
+
                 } catch (error) {
                     console.error('❌ Ошибка при отправке аудио:', error.message);
                 }
