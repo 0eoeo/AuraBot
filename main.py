@@ -12,6 +12,24 @@ bot_state = BotState()
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model = whisper.load_model("tiny", device=device)
 
+# 🔒 Фразы, при наличии которых ответ НЕ должен генерироваться
+BLOCKED_PHRASES = [
+    "динамичная музыка",
+    "смех",
+    "включи музыку",
+    "сыграй песню",
+    "ах ах ах",
+    "ух ух ух",
+    "спокойная музыка",
+    "редактор субтитров"
+]
+
+# ✅ Фразы, при наличии которых текст разрешено отправить на генерацию ответа
+ALLOWED_PHRASES = [
+    "герта",
+    "?"
+]
+
 class AudioRequest(BaseModel):
     speaker: str
     audio: list[float]
@@ -22,19 +40,24 @@ async def recognize(req: AudioRequest):
     audio_np = np.array(req.audio, dtype=np.float32)
 
     result = model.transcribe(audio_np, language="ru")
-    text = result.get("text", "").strip()
-    if not text:
+    text = result.get("text", "").strip().lower()
+    print(f"🎤 Распознанный текст от {speaker}: {text}")
+
+    # Блокируем по ключевым фразам
+    if any(phrase in text for phrase in BLOCKED_PHRASES):
+        print("🚫 Заблокировано по ключевому слову.")
         return StreamingResponse(iter([]), media_type="audio/wav")
 
-    if "динамичная музыка" not in text.lower():
+    # Обрабатываем только если есть подходящая фраза
+    if any(phrase in text for phrase in ALLOWED_PHRASES):
         await bot_state.append_context(f"{speaker}: {text}")
         response_text = await bot_state.get_response_text()
-        if not response_text:
-            return StreamingResponse(iter([]), media_type="audio/wav")
 
-        return StreamingResponse(
-            create_voice_answer_stream(response_text),
-            media_type="audio/wav"
-        )
-    else:
-        return StreamingResponse(iter([]), media_type="audio/wav")
+        if response_text:
+            return StreamingResponse(
+                create_voice_answer_stream(response_text),
+                media_type="audio/wav"
+            )
+
+    # По умолчанию — ничего не делать
+    return StreamingResponse(iter([]), media_type="audio/wav")
