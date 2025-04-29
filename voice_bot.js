@@ -32,14 +32,12 @@ client.on('messageCreate', async message => {
     if (!voiceChannel)
       return message.reply('Ты должен быть в голосовом канале!');
 
-    // Создаем соединение с голосовым каналом
     const connection = joinVoiceChannel({
       channelId: voiceChannel.id,
       guildId: message.guild.id,
       adapterCreator: message.guild.voiceAdapterCreator
     });
 
-    // Добавляем обработчик ошибок на VoiceConnection, чтобы избежать неотловленных ошибок
     connection.on('error', error => {
       console.error('VoiceConnection error:', error);
     });
@@ -70,7 +68,6 @@ client.on('messageCreate', async message => {
       pcmStream.on('end', async () => {
         const buffer = Buffer.concat(chunks);
 
-        // Преобразуем PCM Buffer в Float32Array (значения от -1 до 1)
         const float32Array = new Float32Array(buffer.length / 2);
         for (let i = 0; i < buffer.length; i += 2) {
           const int16 = buffer.readInt16LE(i);
@@ -92,12 +89,15 @@ client.on('messageCreate', async message => {
           connection.subscribe(player);
 
           const audioChunks = [];
+
           response.data.on('data', chunk => {
-            // Если chunk пришёл как число, оборачиваем его в Buffer
-            if (typeof chunk === 'number') {
-              chunk = Buffer.from([chunk]);
-            } else if (!(chunk instanceof Buffer)) {
-              chunk = Buffer.from(chunk);
+            if (!(chunk instanceof Buffer)) {
+              try {
+                chunk = Buffer.from(chunk);
+              } catch (e) {
+                console.warn('⚠️ Пропущен некорректный chunk');
+                return;
+              }
             }
             audioChunks.push(chunk);
           });
@@ -108,11 +108,14 @@ client.on('messageCreate', async message => {
               console.error('❌ Ошибка: пустой аудиофайл');
               return;
             }
+
             try {
-              const resource = createAudioResource(audioBuffer, { inputType: StreamType.Arbitrary });
+              const resource = createAudioResource(audioBuffer, {
+                inputType: StreamType.Arbitrary
+              });
               player.play(resource);
             } catch (error) {
-              console.error('❌ Ошибка при создании ресурса для проигрывания:', error.message);
+              console.error('❌ Ошибка при создании ресурса:', error.message);
             }
           });
 

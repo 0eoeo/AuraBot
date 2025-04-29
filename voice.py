@@ -14,7 +14,6 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 tts = TTS(model_name="tts_models/multilingual/multi-dataset/xtts_v2")
 tts.to(device)
 
-# Генерация речи и запись в файл
 def generate_voice_sync(text: str, output_path: str):
     tts.tts_to_file(
         text=text,
@@ -28,24 +27,19 @@ async def create_voice_answer_stream(text: str) -> AsyncGenerator[bytes, None]:
     output_path = os.path.join(os.getcwd(), output_filename)
 
     try:
-        # Генерация речи синхронно
         generate_voice_sync(text, output_path)
 
-        # Проверяем, создан ли файл и его размер
         if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
             print("⚠️ Ошибка: файл не создан или пустой!")
             return
 
-        print(f"🔊 Аудиофайл успешно сохранён в: {output_path}")
-
-        # Чтение файла и отправка его в виде потока
         with open(output_path, "rb") as f:
-            while chunk := f.read(1024):
+            while True:
+                chunk = f.read(1024)
+                if not chunk:
+                    break
                 yield chunk
 
-        # Удаляем файл после отправки
-        os.remove(output_path)
-
-    except Exception as e:
-        print(f"❌ Ошибка при генерации речи: {e}")
-        return
+    finally:
+        if os.path.exists(output_path):
+            os.remove(output_path)
