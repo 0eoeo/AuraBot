@@ -29,8 +29,11 @@ async def create_voice_answer_stream(text: str) -> AsyncGenerator[bytes, None]:
     try:
         generate_voice_sync(text, output_path)
 
-        if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
-            print("⚠️ Ошибка: файл не создан или пустой!")
+        if not os.path.exists(output_path):
+            print(f"❌ Файл не найден: {output_path}")
+            return
+        if os.path.getsize(output_path) == 0:
+            print(f"⚠️ Файл пустой: {output_path}")
             return
 
         with open(output_path, "rb") as f:
@@ -38,8 +41,15 @@ async def create_voice_answer_stream(text: str) -> AsyncGenerator[bytes, None]:
                 chunk = f.read(1024)
                 if not chunk:
                     break
-                yield chunk
+                if isinstance(chunk, bytes):  # защита от бага
+                    yield chunk
+                else:
+                    print(f"⚠️ chunk не bytes: {type(chunk)}")
+
+    except Exception as e:
+        print(f"❌ Ошибка в генерации потока: {e}")
 
     finally:
         if os.path.exists(output_path):
             os.remove(output_path)
+

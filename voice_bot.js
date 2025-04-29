@@ -88,44 +88,11 @@ client.on('messageCreate', async message => {
           const player = createAudioPlayer();
           connection.subscribe(player);
 
-          const audioChunks = [];
-
-          response.data.on('data', chunk => {
-          if (typeof chunk === 'number') {
-            // Обернуть число в Buffer
-            chunk = Buffer.from([chunk]);
-          } else if (typeof chunk === 'string') {
-            // Если это строка — перекодировать как UTF-8
-            chunk = Buffer.from(chunk, 'utf-8');
-          } else if (!Buffer.isBuffer(chunk)) {
-            // Попробовать привести любой другой тип к Buffer
-            try {
-              chunk = Buffer.from(chunk);
-            } catch (e) {
-              console.error('❌ Не удалось привести chunk к Buffer:', chunk);
-              return;
-            }
-          }
-          audioChunks.push(chunk);
-        });
-
-
-          response.data.on('end', () => {
-            const audioBuffer = Buffer.concat(audioChunks);
-            if (!audioBuffer || audioBuffer.length === 0) {
-              console.error('❌ Ошибка: пустой аудиофайл');
-              return;
-            }
-
-            try {
-              const resource = createAudioResource(audioBuffer, {
-                inputType: StreamType.Arbitrary
-              });
-              player.play(resource);
-            } catch (error) {
-              console.error('❌ Ошибка при создании ресурса:', error.message);
-            }
+          const resource = createAudioResource(response.data, {
+            inputType: StreamType.Arbitrary
           });
+
+          player.play(resource);
 
           player.on(AudioPlayerStatus.Idle, () => {
             console.log('🔊 Проигрывание завершено');
