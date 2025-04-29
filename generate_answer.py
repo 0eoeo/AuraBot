@@ -25,7 +25,7 @@ class BotState:
         self.max_history = 10
         self.context_version = 0
 
-    def append_context(self, message: str):
+    async def append_context(self, message: str):
         print(f"👤 Пользователь {message}")
         self.context_version += 1
         if self.messages[-1].type == 'human':
@@ -36,7 +36,7 @@ class BotState:
         if len(self.messages) > self.max_history:
             self.messages = [self.messages[0]] + self.messages[-self.max_history:]
 
-    def get_response_text(self):
+    async def get_response_text(self):
         try:
             response = self.chat.invoke(self.messages)
             print(f"🤖 Бот: {response.content}")
