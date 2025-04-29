@@ -1,39 +1,14 @@
 import os
-import torch
 import uuid
 import asyncio
-import concurrent.futures
+import aiofiles
+from contextlib import asynccontextmanager
 
-from TTS.api import TTS
-from TTS.tts.configs.xtts_config import XttsConfig, XttsAudioConfig
-from TTS.config.shared_configs import BaseDatasetConfig
-from TTS.tts.models.xtts import XttsArgs
+# Предыдущие импорты и инициализация tts остаются без изменений
 
-# Разрешаем загрузку нестандартных классов
-torch.serialization.add_safe_globals([XttsConfig, XttsAudioConfig, BaseDatasetConfig, XttsArgs])
+CHUNK_SIZE = 4096  # или 8192, подбирается под нужную задержку
 
-# Инициализация модели при старте (на CPU или GPU)
-device = "cuda" if torch.cuda.is_available() else "cpu"
-tts = TTS(model_name="tts_models/multilingual/multi-dataset/xtts_v2")
-tts.to(device)
-
-# Создаём executor для фона
-executor = concurrent.futures.ThreadPoolExecutor()
-
-# Путь к эталонному голосу
-speaker_wav = "зани.wav"
-
-# Синхронная функция генерации
-def _generate_voice_sync(text: str, output_path: str):
-    tts.tts_to_file(
-        text=text,
-        speaker_wav=speaker_wav,
-        language="ru",
-        file_path=output_path
-    )
-
-# Асинхронная обёртка
-async def create_voice_answer(text: str) -> str:
+async def create_voice_answer_stream(text: str):
     output_filename = f"{uuid.uuid4().hex}.wav"
     output_path = os.path.join(os.getcwd(), output_filename)
 
@@ -41,12 +16,22 @@ async def create_voice_answer(text: str) -> str:
     try:
         await loop.run_in_executor(executor, _generate_voice_sync, text, output_path)
 
-        if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
-            print(f"🔊 Аудиофайл успешно сохранён в: {output_path}")
-            return output_path
-        else:
+        if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
             print("⚠️ Ошибка: файл не создан или пустой!")
-            return None
+            return
+
+        async with aiofiles.open(output_path, "rb") as f:
+            while True:
+                chunk = await f.read(CHUNK_SIZE)
+                if not chunk:
+                    break
+                yield chunk
+
     except Exception as e:
         print(f"❌ Ошибка при генерации речи: {e}")
-        return None
+    finally:
+        try:
+            if os.path.exists(output_path):
+                os.remove(output_path)
+        except Exception as cleanup_error:
+            print(f"⚠️ Ошибка при удалении файла: {cleanup_error}")
