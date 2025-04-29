@@ -9,6 +9,7 @@ const {
 } = require('@discordjs/voice');
 const prism = require('prism-media');
 const axios = require('axios');
+const { Readable } = require('stream');
 require('dotenv').config();
 
 const client = new Client({
@@ -63,7 +64,7 @@ client.on('messageCreate', async message => {
             pcmStream.on('end', async () => {
                 const buffer = Buffer.concat(chunks);
 
-                // Преобразуем PCM 16-битный Buffer в Float32 (от -1 до 1)
+                // Int16 -> Float32 [-1.0, 1.0]
                 const float32Array = new Float32Array(buffer.length / 2);
                 for (let i = 0; i < buffer.length; i += 2) {
                     const int16 = buffer.readInt16LE(i);
@@ -77,30 +78,28 @@ client.on('messageCreate', async message => {
 
                 try {
                     const response = await axios.post('http://localhost:8000/recognize', payload, {
-                        responseType: 'stream',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        }
+                        responseType: 'arraybuffer',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+
+                    // Преобразуем arraybuffer в stream
+                    const audioBuffer = Buffer.from(response.data);
+                    const audioStream = Readable.from(audioBuffer);
+
+                    const resource = createAudioResource(audioStream, {
+                        inputType: StreamType.Arbitrary
                     });
 
                     const player = createAudioPlayer();
+                    player.play(resource);
                     connection.subscribe(player);
-
-                    const chunks = [];
-                    response.data.on('data', chunk => chunks.push(chunk));
-
-                    response.data.on('end', () => {
-                        const audioBuffer = Buffer.concat(chunks);
-                        const resource = createAudioResource(audioBuffer, { inputType: StreamType.Arbitrary });
-                        player.play(resource);
-                    });
 
                     player.on(AudioPlayerStatus.Idle, () => {
                         console.log('🔊 Проигрывание завершено');
                     });
 
-                    player.on('error', error => {
-                        console.error('🎧 Ошибка проигрывания:', error.message);
+                    player.on('error', err => {
+                        console.error('❌ Ошибка проигрывания:', err.message);
                     });
 
                 } catch (error) {
