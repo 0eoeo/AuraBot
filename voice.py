@@ -33,7 +33,7 @@ def _generate_voice_sync(text: str, output_path: str):
     )
 
 # Асинхронная обёртка
-async def create_voice_answer(text: str) -> str:
+async def create_voice_answer_stream(text: str) -> str:
     output_filename = f"{uuid.uuid4().hex}.wav"
     output_path = os.path.join(os.getcwd(), output_filename)
 
