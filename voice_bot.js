@@ -9,7 +9,6 @@ const {
 } = require('@discordjs/voice');
 const prism = require('prism-media');
 const axios = require('axios');
-const { Readable } = require('stream');
 require('dotenv').config();
 
 const client = new Client({
@@ -20,6 +19,9 @@ const client = new Client({
         GatewayIntentBits.MessageContent
     ]
 });
+
+const lastReplyTimestamps = new Map(); // userId -> timestamp
+const MIN_INTERVAL_MS = 5000; // 5 секунд между ответами
 
 client.once('ready', () => {
     console.log(`🔊 Logged in as ${client.user.tag}`);
@@ -44,6 +46,14 @@ client.on('messageCreate', async message => {
             const user = message.guild.members.cache.get(userId);
             if (user?.user?.bot) return;
 
+            const now = Date.now();
+            const lastTime = lastReplyTimestamps.get(userId) || 0;
+            if (now - lastTime < MIN_INTERVAL_MS) {
+                console.log(`⏳ Пропускаем генерацию для ${user.displayName}`);
+                return;
+            }
+            lastReplyTimestamps.set(userId, now);
+
             const opusStream = receiver.subscribe(userId, {
                 end: { behavior: EndBehaviorType.AfterSilence, duration: 1000 }
             });
@@ -64,7 +74,7 @@ client.on('messageCreate', async message => {
             pcmStream.on('end', async () => {
                 const buffer = Buffer.concat(chunks);
 
-                // Int16 -> Float32 [-1.0, 1.0]
+                // Преобразуем PCM Buffer в Float32
                 const float32Array = new Float32Array(buffer.length / 2);
                 for (let i = 0; i < buffer.length; i += 2) {
                     const int16 = buffer.readInt16LE(i);
@@ -77,29 +87,31 @@ client.on('messageCreate', async message => {
                 };
 
                 try {
-                    const response = await axios.post('http://localhost:8000/recognize', payload, {
-                        responseType: 'arraybuffer',
-                        headers: { 'Content-Type': 'application/json' }
-                    });
-
-                    // Преобразуем arraybuffer в stream
-                    const audioBuffer = Buffer.from(response.data);
-                    const audioStream = Readable.from(audioBuffer);
-
-                    const resource = createAudioResource(audioStream, {
-                        inputType: StreamType.Arbitrary
+                    const response = await axios.post('http://localhost:5000/recognize', payload, {
+                        responseType: 'stream',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
                     });
 
                     const player = createAudioPlayer();
-                    player.play(resource);
                     connection.subscribe(player);
+
+                    const audioChunks = [];
+                    response.data.on('data', chunk => audioChunks.push(chunk));
+
+                    response.data.on('end', () => {
+                        const audioBuffer = Buffer.concat(audioChunks);
+                        const resource = createAudioResource(audioBuffer, { inputType: StreamType.Arbitrary });
+                        player.play(resource);
+                    });
 
                     player.on(AudioPlayerStatus.Idle, () => {
                         console.log('🔊 Проигрывание завершено');
                     });
 
-                    player.on('error', err => {
-                        console.error('❌ Ошибка проигрывания:', err.message);
+                    player.on('error', error => {
+                        console.error('🎧 Ошибка проигрывания:', error.message);
                     });
 
                 } catch (error) {
