@@ -3,12 +3,17 @@ import torch
 import uuid
 from typing import AsyncGenerator
 from TTS.api import TTS
+from TTS.tts.configs.xtts_config import XttsConfig, XttsAudioConfig
+from TTS.config.shared_configs import BaseDatasetConfig
+from TTS.tts.models.xtts import XttsArgs
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 tts = TTS(model_name="tts_models/multilingual/multi-dataset/xtts_v2")
 tts.to(device)
 
 speaker_wav = "няру.wav"
+
+torch.serialization.add_safe_globals([XttsConfig, XttsAudioConfig, BaseDatasetConfig, XttsArgs])
 
 
 # Генерация речи и запись в файл

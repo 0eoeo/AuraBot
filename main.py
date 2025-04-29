@@ -22,7 +22,7 @@ async def recognize(req: AudioRequest):
     speaker = req.speaker
     audio_np = np.array(req.audio, dtype=np.float32)
 
-    result = model.transcribe(audio_np)
+    result = model.transcribe(audio_np, language="ru")
     text = result.get("text", "").strip()
     if not text:
         return StreamingResponse(iter([]), media_type="audio/wav")
