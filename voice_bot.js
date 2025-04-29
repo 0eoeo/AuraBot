@@ -91,16 +91,24 @@ client.on('messageCreate', async message => {
           const audioChunks = [];
 
           response.data.on('data', chunk => {
-            if (!(chunk instanceof Buffer)) {
-              try {
-                chunk = Buffer.from(chunk);
-              } catch (e) {
-                console.warn('⚠️ Пропущен некорректный chunk');
-                return;
-              }
+          if (typeof chunk === 'number') {
+            // Обернуть число в Buffer
+            chunk = Buffer.from([chunk]);
+          } else if (typeof chunk === 'string') {
+            // Если это строка — перекодировать как UTF-8
+            chunk = Buffer.from(chunk, 'utf-8');
+          } else if (!Buffer.isBuffer(chunk)) {
+            // Попробовать привести любой другой тип к Buffer
+            try {
+              chunk = Buffer.from(chunk);
+            } catch (e) {
+              console.error('❌ Не удалось привести chunk к Buffer:', chunk);
+              return;
             }
-            audioChunks.push(chunk);
-          });
+          }
+          audioChunks.push(chunk);
+        });
+
 
           response.data.on('end', () => {
             const audioBuffer = Buffer.concat(audioChunks);
