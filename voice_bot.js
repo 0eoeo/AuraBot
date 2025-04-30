@@ -20,6 +20,9 @@ const client = new Client({
   ]
 });
 
+const playbackQueue = [];
+let isPlaying = false;
+
 client.once('ready', () => {
   console.log(`🔊 Logged in as ${client.user.tag}`);
 });
@@ -43,10 +46,39 @@ client.on('messageCreate', async message => {
     });
 
     const receiver = connection.receiver;
+    const activeStreams = new Map();
+    const player = createAudioPlayer();
+    connection.subscribe(player);
+
+    async function playNext() {
+      if (isPlaying || playbackQueue.length === 0) return;
+
+      const next = playbackQueue.shift();
+      isPlaying = true;
+
+      const resource = createAudioResource(next.stream, {
+        inputType: StreamType.Arbitrary
+      });
+
+      player.play(resource);
+
+      player.once(AudioPlayerStatus.Idle, () => {
+        isPlaying = false;
+        playNext(); // запуск следующего
+      });
+
+      player.once('error', error => {
+        console.error('🎧 Ошибка проигрывания:', error.message);
+        isPlaying = false;
+        playNext();
+      });
+    }
 
     receiver.speaking.on('start', userId => {
+      if (activeStreams.has(userId)) return;
+
       const user = message.guild.members.cache.get(userId);
-      if (user?.user?.bot) return;
+      if (!user || user.user.bot) return;
 
       const opusStream = receiver.subscribe(userId, {
         end: { behavior: EndBehaviorType.AfterSilence, duration: 1000 }
@@ -59,6 +91,7 @@ client.on('messageCreate', async message => {
       });
 
       opusStream.pipe(pcmStream);
+      activeStreams.set(userId, true);
 
       const chunks = [];
       pcmStream.on('data', chunk => {
@@ -66,6 +99,7 @@ client.on('messageCreate', async message => {
       });
 
       pcmStream.on('end', async () => {
+        activeStreams.delete(userId);
         const buffer = Buffer.concat(chunks);
 
         const float32Array = new Float32Array(buffer.length / 2);
@@ -80,30 +114,18 @@ client.on('messageCreate', async message => {
 
         try {
           const speakerName = Buffer.from(user.displayName, 'utf-8').toString('base64');
-          const response = await axios.post('http://localhost:8000/recognize', payload, {
+          const response = await axios.post('http://localhost:5000/recognize', payload, {
             responseType: 'stream',
             headers: {
-                'Content-Type': 'application/json',
-                'X-Speaker-Name': speakerName
-              }
+              'Content-Type': 'application/json',
+              'X-Speaker-Name': speakerName
+            }
           });
 
-          const player = createAudioPlayer();
-          connection.subscribe(player);
+          // добавляем в очередь
+          playbackQueue.push({ stream: response.data });
+          playNext();
 
-          const resource = createAudioResource(response.data, {
-            inputType: StreamType.Arbitrary
-          });
-
-          player.play(resource);
-
-          player.on(AudioPlayerStatus.Idle, () => {
-            console.log('🔊 Проигрывание завершено');
-          });
-
-          player.on('error', error => {
-            console.error('🎧 Ошибка проигрывания:', error.message);
-          });
         } catch (error) {
           console.error('❌ Ошибка при отправке аудио:', error.message);
         }
