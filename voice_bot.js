@@ -2,17 +2,11 @@ const { Client, GatewayIntentBits } = require('discord.js');
 const {
     joinVoiceChannel,
     getVoiceConnection,
-    EndBehaviorType,
-    createAudioPlayer,
-    createAudioResource,
-    AudioPlayerStatus,
-    StreamType
+    EndBehaviorType
 } = require('@discordjs/voice');
 const prism = require('prism-media');
 const fs = require('fs');
 const axios = require('axios');
-const ffmpeg = require('ffmpeg-static');
-const { spawn } = require('child_process');
 const path = require('path');
 require('dotenv').config();
 
@@ -33,8 +27,8 @@ const client = new Client({
     ]
 });
 
-const activeTalkers = new Map();         // userId -> last talk time
-const recordingInProgress = new Set();   // userId currently being recorded
+const activeTalkers = new Map();
+const recordingInProgress = new Set();
 
 function canStartNewRecording(userId) {
     const now = Date.now();
@@ -54,7 +48,7 @@ client.on('messageCreate', async message => {
             return message.reply('Ты должен быть в голосовом канале!');
         }
 
-        const connection = joinVoiceChannel({
+        joinVoiceChannel({
             channelId: message.member.voice.channel.id,
             guildId: message.guild.id,
             adapterCreator: message.guild.voiceAdapterCreator
@@ -78,7 +72,6 @@ client.on('voiceStateUpdate', (oldState, newState) => {
     const userId = newState.id;
 
     if (!member || member.user.bot) return;
-
     const channel = newState.channel;
     if (!channel || !channel.members.has(client.user.id)) return;
 
@@ -103,7 +96,7 @@ function startRecording(userId, user, connection) {
 
     const pcmStream = new prism.opus.Decoder({
         rate: 48000,
-        channels: 2,
+        channels: 1,
         frameSize: 960
     });
 
@@ -139,7 +132,6 @@ function startRecording(userId, user, connection) {
                 return;
             }
 
-            // Преобразуем PCM → Float32[]
             const int16Array = new Int16Array(buffer.buffer, buffer.byteOffset, buffer.length / Int16Array.BYTES_PER_ELEMENT);
             const float32Array = Float32Array.from(int16Array, x => x / 32768);
             const audioArray = Array.from(float32Array);
@@ -155,12 +147,16 @@ function startRecording(userId, user, connection) {
             if (res.data && res.data.status === 'accepted') {
                 console.log('✅ Задача отправлена на сервер');
             } else {
-                console.log('⚠️ Сервер вернул неожиданный ответ');
+                console.log('⚠️ Сервер вернул неожиданный ответ:', res.data);
             }
         } catch (err) {
-            console.error('❌ Ошибка при обработке аудио:', err.message);
+            if (err.response) {
+                console.error('❌ Ошибка ответа от сервера:', err.response.status, err.response.data);
+            } else {
+                console.error('❌ Ошибка при отправке запроса:', err.message);
+            }
         } finally {
-            recordingInProgress.delete(userId); // 💡 важно!
+            recordingInProgress.delete(userId);
             setTimeout(async () => {
                 await fs.promises.unlink(filepath);
                 console.log(`🗑️ Удалён ${filepath}`);
