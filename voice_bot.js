@@ -1,136 +1,169 @@
 const { Client, GatewayIntentBits } = require('discord.js');
 const {
-  joinVoiceChannel,
-  createAudioPlayer,
-  createAudioResource,
-  AudioPlayerStatus,
-  EndBehaviorType,
-  StreamType
+    joinVoiceChannel,
+    getVoiceConnection,
+    EndBehaviorType,
+    createAudioPlayer,
+    createAudioResource,
+    AudioPlayerStatus,
+    StreamType
 } = require('@discordjs/voice');
 const prism = require('prism-media');
+const fs = require('fs');
 const axios = require('axios');
+const ffmpeg = require('ffmpeg-static');
+const { spawn } = require('child_process');
+const path = require('path');
 require('dotenv').config();
 
+const token = process.env.BOT_TOKEN;
+const RECORDINGS_DIR = './recordings';
+const SILENCE_TIMEOUT = 5000;
+
+if (!fs.existsSync(RECORDINGS_DIR)) {
+    fs.mkdirSync(RECORDINGS_DIR, { recursive: true });
+}
+
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildVoiceStates,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
-  ]
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildVoiceStates,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent
+    ]
 });
 
-// Очередь для проигрывания
-const playbackQueue = [];
-let isPlaying = false;
+const activeTalkers = new Map();         // userId -> last talk time
+const recordingInProgress = new Set();   // userId currently being recorded
+
+function canStartNewRecording(userId) {
+    const now = Date.now();
+    const lastTime = activeTalkers.get(userId) || 0;
+    return (now - lastTime) > SILENCE_TIMEOUT;
+}
 
 client.once('ready', () => {
-  console.log(`🔊 Logged in as ${client.user.tag}`);
+    console.log(`🔊 Logged in as ${client.user.tag}`);
 });
 
 client.on('messageCreate', async message => {
-  if (message.author.bot) return;
+    if (message.author.bot) return;
 
-  if (message.content === '!join') {
-    const voiceChannel = message.member.voice.channel;
-    if (!voiceChannel)
-      return message.reply('Ты должен быть в голосовом канале!');
-
-    const connection = joinVoiceChannel({
-      channelId: voiceChannel.id,
-      guildId: message.guild.id,
-      adapterCreator: message.guild.voiceAdapterCreator
-    });
-
-    const receiver = connection.receiver;
-    const player = createAudioPlayer();
-    connection.subscribe(player);
-
-    const activeStreams = new Map();
-
-    const playNext = () => {
-      if (playbackQueue.length === 0) {
-        isPlaying = false;
-        return;
-      }
-
-      const next = playbackQueue.shift();
-      isPlaying = true;
-      player.play(next);
-    };
-
-    player.on(AudioPlayerStatus.Idle, () => {
-      playNext();
-    });
-
-    player.on('error', error => {
-      console.error('🎧 Ошибка проигрывания:', error.message);
-      playNext();
-    });
-
-    receiver.speaking.on('start', userId => {
-      if (activeStreams.has(userId)) return;
-
-      const user = message.guild.members.cache.get(userId);
-      if (!user || user.user.bot) return;
-
-      const opusStream = receiver.subscribe(userId, {
-        end: { behavior: EndBehaviorType.AfterSilence, duration: 1000 }
-      });
-
-      const pcmStream = new prism.opus.Decoder({
-        rate: 16000,
-        channels: 1,
-        frameSize: 960
-      });
-
-      opusStream.pipe(pcmStream);
-      activeStreams.set(userId, true);
-
-      const chunks = [];
-      pcmStream.on('data', chunk => {
-        chunks.push(chunk);
-      });
-
-      pcmStream.on('end', async () => {
-        activeStreams.delete(userId);
-        const buffer = Buffer.concat(chunks);
-
-        const float32Array = new Float32Array(buffer.length / 2);
-        for (let i = 0; i < buffer.length; i += 2) {
-          const int16 = buffer.readInt16LE(i);
-          float32Array[i / 2] = int16 / 32768;
+    if (message.content === '!join') {
+        if (!message.member.voice.channel) {
+            return message.reply('Ты должен быть в голосовом канале!');
         }
 
-        const payload = {
-          audio: Array.from(float32Array)
-        };
+        const connection = joinVoiceChannel({
+            channelId: message.member.voice.channel.id,
+            guildId: message.guild.id,
+            adapterCreator: message.guild.voiceAdapterCreator
+        });
 
-        try {
-          const speakerName = Buffer.from(user.displayName, 'utf-8').toString('base64');
-          const response = await axios.post('http://localhost:8000/recognize', payload, {
-            responseType: 'stream',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Speaker-Name': speakerName
-            }
-          });
+        console.log('✅ Подключился к голосовому каналу');
+        message.reply('🔊 Подключился к голосовому каналу!');
+    }
 
-          const resource = createAudioResource(response.data, {
-            inputType: StreamType.Arbitrary
-          });
-
-          playbackQueue.push(resource);
-
-          if (!isPlaying) {
-            playNext();
-          }
-        } catch (error) {
-          console.error('❌ Ошибка при отправке аудио:', error.message);
+    if (message.content === '!leave') {
+        const conn = getVoiceConnection(message.guild.id);
+        if (conn) {
+            conn.destroy();
+            message.reply('🚪 Вышел из голосового канала.');
         }
-      });
-    });
-  }
+    }
 });
 
-client.login(process.env.BOT_TOKEN);
+client.on('voiceStateUpdate', (oldState, newState) => {
+    const member = newState.member;
+    const userId = newState.id;
+
+    if (!member || member.user.bot) return;
+
+    const channel = newState.channel;
+    if (!channel || !channel.members.has(client.user.id)) return;
+
+    const connection = getVoiceConnection(channel.guild.id);
+    if (!connection) return;
+
+    if (recordingInProgress.has(userId) || !canStartNewRecording(userId)) return;
+
+    activeTalkers.set(userId, Date.now());
+    recordingInProgress.add(userId);
+    console.log(`🎙️ ${member.displayName} начал говорить`);
+
+    startRecording(userId, member, connection);
+});
+
+function startRecording(userId, user, connection) {
+    const receiver = connection.receiver;
+
+    const opusStream = receiver.subscribe(userId, {
+        end: { behavior: EndBehaviorType.Manual }
+    });
+
+    const pcmStream = new prism.opus.Decoder({
+        rate: 48000,
+        channels: 2,
+        frameSize: 960
+    });
+
+    const filename = `${user.displayName}-${Date.now()}.pcm`;
+    const filepath = path.join(RECORDINGS_DIR, filename);
+    const output = fs.createWriteStream(filepath);
+
+    opusStream.pipe(pcmStream).pipe(output);
+
+    let stopTimeout;
+    const stopRecording = () => {
+        opusStream.destroy();
+        output.end();
+        clearTimeout(stopTimeout);
+    };
+
+    opusStream.on('data', () => {
+        clearTimeout(stopTimeout);
+        stopTimeout = setTimeout(stopRecording, SILENCE_TIMEOUT);
+    });
+
+    opusStream.on('end', () => {
+        stopRecording();
+    });
+
+    output.on('finish', async () => {
+        console.log(`📁 Записан файл: ${filepath}`);
+
+        try {
+            const buffer = await fs.promises.readFile(filepath);
+            if (!buffer || buffer.length === 0) {
+                console.warn('⚠️ Пустой аудиофайл — пропускаем');
+                return;
+            }
+
+            // Преобразуем PCM → Float32[]
+            const int16Array = new Int16Array(buffer.buffer, buffer.byteOffset, buffer.length / Int16Array.BYTES_PER_ELEMENT);
+            const float32Array = Float32Array.from(int16Array, x => x / 32768);
+            const audioArray = Array.from(float32Array);
+
+            const res = await axios.post('http://127.0.0.1:5000/recognize', {
+                speaker: user.displayName,
+                audio: audioArray
+            });
+
+            if (res.data && res.data.status === 'accepted') {
+                console.log('✅ Задача отправлена на сервер');
+            } else {
+                console.log('⚠️ Сервер вернул неожиданный ответ');
+            }
+        } catch (err) {
+            console.error('❌ Ошибка при обработке аудио:', err.message);
+        } finally {
+            recordingInProgress.delete(userId); // 💡 важно!
+            setTimeout(async () => {
+                await fs.promises.unlink(filepath);
+                console.log(`🗑️ Удалён ${filepath}`);
+            }, 5000);
+        }
+    });
+}
+
+client.login(token);
