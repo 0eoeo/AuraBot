@@ -65,7 +65,8 @@ async def recognize(request: Request, audio_data: AudioRequest):
         if response_text:
             return StreamingResponse(
                 create_voice_answer_stream(response_text),
-                media_type="audio/wav"
+                media_type="audio/wav",
+                headers={"X-Content-Type-Options": "nosniff"}
             )
 
     # По умолчанию — ничего не делать
