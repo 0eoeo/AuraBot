@@ -149,6 +149,9 @@ function startRecording(userId, user, connection) {
                 audio: audioArray
             });
 
+            console.log('Ответ от сервера:', res.data);
+            console.log('HTTP статус:', res.status);
+
             if (res.data && res.data.status === 'accepted') {
                 console.log('✅ Задача отправлена на сервер');
             } else {
