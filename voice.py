@@ -7,7 +7,7 @@ from TTS.tts.configs.xtts_config import XttsConfig, XttsAudioConfig
 from TTS.config.shared_configs import BaseDatasetConfig
 from TTS.tts.models.xtts import XttsArgs
 
-speaker_wav = "няру.wav"
+speaker_wav = "герта.wav"
 torch.serialization.add_safe_globals([XttsConfig, XttsAudioConfig, BaseDatasetConfig, XttsArgs])
 
 device = "cuda" if torch.cuda.is_available() else "cpu"

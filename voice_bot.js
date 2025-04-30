@@ -75,14 +75,17 @@ client.on('messageCreate', async message => {
         }
 
         const payload = {
-          speaker: user.displayName,
           audio: Array.from(float32Array)
         };
 
         try {
-          const response = await axios.post('http://localhost:5000/recognize', payload, {
+          const speakerName = Buffer.from(user.displayName, 'utf-8').toString('base64');
+          const response = await axios.post('http://localhost:8000/recognize', payload, {
             responseType: 'stream',
-            headers: { 'Content-Type': 'application/json' }
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Speaker-Name': speakerName
+              }
           });
 
           const player = createAudioPlayer();

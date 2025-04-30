@@ -1,5 +1,7 @@
+import base64
+
 import numpy as np
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from generate_answer import BotState
@@ -31,13 +33,20 @@ ALLOWED_PHRASES = [
 ]
 
 class AudioRequest(BaseModel):
-    speaker: str
     audio: list[float]
 
+def decode_speaker_name(encoded_name: str) -> str:
+    try:
+        return base64.b64decode(encoded_name).decode("utf-8")
+    except Exception:
+        return "Бро"
+
 @app.post("/recognize")
-async def recognize(req: AudioRequest):
-    speaker = req.speaker
-    audio_np = np.array(req.audio, dtype=np.float32)
+async def recognize(request: Request, audio_data: AudioRequest):
+    speaker_b64 = request.headers.get("X-Speaker-Name")
+    speaker = decode_speaker_name(speaker_b64) if speaker_b64 else "Бро"
+
+    audio_np = np.array(audio_data.audio, dtype=np.float32)
 
     result = model.transcribe(audio_np, language="ru")
     text = result.get("text", "").strip().lower()
