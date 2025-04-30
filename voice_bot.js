@@ -20,26 +20,9 @@ const client = new Client({
   ]
 });
 
-// Очередь проигрывания
+// Очередь для проигрывания
 const playbackQueue = [];
 let isPlaying = false;
-
-function playNext(player, connection) {
-  if (playbackQueue.length === 0) {
-    isPlaying = false;
-    return;
-  }
-
-  isPlaying = true;
-  const { stream } = playbackQueue.shift();
-
-  const resource = createAudioResource(stream, {
-    inputType: StreamType.Arbitrary
-  });
-
-  player.play(resource);
-  connection.subscribe(player);
-}
 
 client.once('ready', () => {
   console.log(`🔊 Logged in as ${client.user.tag}`);
@@ -50,9 +33,8 @@ client.on('messageCreate', async message => {
 
   if (message.content === '!join') {
     const voiceChannel = message.member.voice.channel;
-    if (!voiceChannel) {
+    if (!voiceChannel)
       return message.reply('Ты должен быть в голосовом канале!');
-    }
 
     const connection = joinVoiceChannel({
       channelId: voiceChannel.id,
@@ -60,38 +42,40 @@ client.on('messageCreate', async message => {
       adapterCreator: message.guild.voiceAdapterCreator
     });
 
-    connection.on('error', error => {
-      console.error('VoiceConnection error:', error);
-    });
-
     const receiver = connection.receiver;
-    const subscribedUsers = new Set();
     const player = createAudioPlayer();
+    connection.subscribe(player);
 
-    // Убираем warning про слишком много слушателей
-    player.setMaxListeners(20);
+    const activeStreams = new Map();
+
+    const playNext = () => {
+      if (playbackQueue.length === 0) {
+        isPlaying = false;
+        return;
+      }
+
+      const next = playbackQueue.shift();
+      isPlaying = true;
+      player.play(next);
+    };
 
     player.on(AudioPlayerStatus.Idle, () => {
-      playNext(player, connection);
+      playNext();
     });
 
     player.on('error', error => {
       console.error('🎧 Ошибка проигрывания:', error.message);
-      playNext(player, connection);
+      playNext();
     });
 
     receiver.speaking.on('start', userId => {
-      if (subscribedUsers.has(userId)) return;
-      subscribedUsers.add(userId);
+      if (activeStreams.has(userId)) return;
 
       const user = message.guild.members.cache.get(userId);
       if (!user || user.user.bot) return;
 
       const opusStream = receiver.subscribe(userId, {
-        end: {
-          behavior: EndBehaviorType.AfterSilence,
-          duration: 1000
-        }
+        end: { behavior: EndBehaviorType.AfterSilence, duration: 1000 }
       });
 
       const pcmStream = new prism.opus.Decoder({
@@ -101,17 +85,15 @@ client.on('messageCreate', async message => {
       });
 
       opusStream.pipe(pcmStream);
+      activeStreams.set(userId, true);
 
       const chunks = [];
-
       pcmStream.on('data', chunk => {
         chunks.push(chunk);
       });
 
       pcmStream.on('end', async () => {
-        subscribedUsers.delete(userId);
-
-        if (chunks.length === 0) return;
+        activeStreams.delete(userId);
         const buffer = Buffer.concat(chunks);
 
         const float32Array = new Float32Array(buffer.length / 2);
@@ -126,8 +108,7 @@ client.on('messageCreate', async message => {
 
         try {
           const speakerName = Buffer.from(user.displayName, 'utf-8').toString('base64');
-
-          const response = await axios.post('http://localhost:5000/recognize', payload, {
+          const response = await axios.post('http://localhost:8000/recognize', payload, {
             responseType: 'stream',
             headers: {
               'Content-Type': 'application/json',
@@ -135,10 +116,14 @@ client.on('messageCreate', async message => {
             }
           });
 
-          playbackQueue.push({ stream: response.data });
+          const resource = createAudioResource(response.data, {
+            inputType: StreamType.Arbitrary
+          });
+
+          playbackQueue.push(resource);
 
           if (!isPlaying) {
-            playNext(player, connection);
+            playNext();
           }
         } catch (error) {
           console.error('❌ Ошибка при отправке аудио:', error.message);
