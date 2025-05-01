@@ -10,41 +10,44 @@ from TTS.tts.models.xtts import XttsArgs
 torch.serialization.add_safe_globals([XttsConfig, XttsAudioConfig, BaseDatasetConfig, XttsArgs])
 
 class VoiceGenerator:
-    def __init__(self, speaker_wav: str, language: str = "ru", model_name: str = "tts_models/multilingual/multi-dataset/xtts_v2"):
-        self.speaker_wav = speaker_wav
-        self.language = language
+    def __init__(self, speaker_wav: str):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.tts = TTS(model_name=model_name)
+        self.tts = TTS(model_name="tts_models/multilingual/multi-dataset/xtts_v2")
         self.tts.to(self.device)
+        self.speaker_wav = speaker_wav
 
-    def generate_to_file(self, text: str, output_path: str):
+    def _split_text(self, text: str, chunk_size: int = 2) -> list[str]:
+        words = text.strip().split()
+        return [' '.join(words[i:i + chunk_size]) for i in range(0, len(words), chunk_size)]
+
+    def _generate_segment(self, segment_text: str, path: str):
         self.tts.tts_to_file(
-            text=text,
+            text=segment_text,
             speaker_wav=self.speaker_wav,
-            language=self.language,
-            file_path=output_path
+            language="ru",
+            file_path=path
         )
 
     async def stream_voice(self, text: str) -> AsyncGenerator[bytes, None]:
-        output_filename = f"{uuid.uuid4().hex}.wav"
-        output_path = os.path.join(os.getcwd(), output_filename)
+        segments = self._split_text(text, chunk_size=2)
 
-        try:
-            self.generate_to_file(text, output_path)
+        for segment in segments:
+            filename = f"{uuid.uuid4().hex}.wav"
+            filepath = os.path.join(os.getcwd(), filename)
 
-            if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
-                print(f"❌ Проблема с файлом: {output_path}")
-                return
+            try:
+                self._generate_segment(segment, filepath)
 
-            with open(output_path, "rb") as f:
-                while chunk := f.read(1024):
-                    if isinstance(chunk, bytes):
+                if not os.path.exists(filepath) or os.path.getsize(filepath) == 0:
+                    print(f"⚠️ Пропущен сегмент: {segment}")
+                    continue
+
+                with open(filepath, "rb") as f:
+                    while chunk := f.read(1024):
                         yield chunk
-                    else:
-                        print(f"⚠️ Неверный тип данных: {type(chunk)}")
 
-        except Exception as e:
-            print(f"❌ Ошибка TTS: {e}")
-        finally:
-            if os.path.exists(output_path):
-                os.remove(output_path)
+            except Exception as e:
+                print(f"❌ Ошибка генерации сегмента '{segment}': {e}")
+            finally:
+                if os.path.exists(filepath):
+                    os.remove(filepath)
