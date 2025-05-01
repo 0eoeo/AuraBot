@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 import torch
 from typing import AsyncGenerator
@@ -16,9 +17,9 @@ class VoiceGenerator:
         self.tts.to(self.device)
         self.speaker_wav = speaker_wav
 
-    def _split_text(self, text: str, chunk_size: int = 2) -> list[str]:
-        words = text.strip().split()
-        return [' '.join(words[i:i + chunk_size]) for i in range(0, len(words), chunk_size)]
+    def _split_text_into_sentences(self, text: str) -> list[str]:
+        sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+        return [s for s in sentences if s]
 
     def _generate_segment(self, segment_text: str, path: str):
         self.tts.tts_to_file(
@@ -29,7 +30,7 @@ class VoiceGenerator:
         )
 
     async def stream_voice(self, text: str) -> AsyncGenerator[bytes, None]:
-        segments = self._split_text(text, chunk_size=2)
+        segments = self._split_text_into_sentences(text)
 
         for segment in segments:
             filename = f"{uuid.uuid4().hex}.wav"
