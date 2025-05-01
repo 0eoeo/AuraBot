@@ -1,8 +1,8 @@
 const { Client, GatewayIntentBits } = require('discord.js');
 require('dotenv').config();
 
-const joinCommand = require('./commands/join');
-const leaveCommand = require('./commands/leave');
+const joinCommand = require('./js/commands/join');
+const leaveCommand = require('./js/commands/leave');
 
 const client = new Client({
   intents: [

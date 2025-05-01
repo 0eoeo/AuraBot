@@ -6,9 +6,9 @@ from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from voice_generator.context_manager import ChatContextManager
-from voice_generator.voice_generator import VoiceGenerator
-from voice_generator.config import SPEAKER_WAV
+from python.voice_generator.context_manager import ChatContextManager
+from python.voice_generator.voice_generator import VoiceGenerator
+from python.voice_generator.config import SPEAKER_WAV
 
 app = FastAPI()
 
