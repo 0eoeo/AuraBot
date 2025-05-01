@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from python.voice_generator.context_manager import ChatContextManager
 from python.voice_generator.voice_generator import VoiceGenerator
-from python.voice_generator.config import SPEAKER_WAV
+from python.voice_generator.config import SPEAKER_WAV, ALLOWED_PHRASES, BLOCKED_PHRASES
 
 app = FastAPI()
 
