@@ -1,4 +1,4 @@
-const { joinVoice } = require('../js/voice/manager');
+const { joinVoice } = require('../voice/manager');
 
 module.exports = async function join(message) {
   const voiceChannel = message.member.voice.channel;

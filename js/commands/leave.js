@@ -1,4 +1,4 @@
-const { leaveVoice } = require('../js/voice/manager');
+const { leaveVoice } = require('../voice/manager');
 
 module.exports = function leave(message) {
   leaveVoice(message);

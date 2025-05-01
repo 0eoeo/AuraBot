@@ -5,7 +5,7 @@ const {
   AudioPlayerStatus,
   StreamType
 } = require('@discordjs/voice');
-const { handleAudio } = require('./js/audio_handler');
+const { handleAudio } = require('./audio_handler');
 
 const guildStates = new Map();
 
