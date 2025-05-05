@@ -47,7 +47,7 @@ async def reply(text_req: TextRequest):
             voice_generator.stream_voice(response_text),
             media_type="audio/wav",
             headers={
-                "X-Generated-Text": encoded,
+                "x-generated-text": encoded,
                 "X-Content-Type-Options": "nosniff"
             }
         )
