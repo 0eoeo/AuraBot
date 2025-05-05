@@ -17,10 +17,6 @@ class VoiceGenerator:
         self.tts.to(self.device)
         self.speaker_wav = speaker_wav
 
-    def _split_text_into_sentences(self, text: str) -> list[str]:
-        sentences = re.split(r'(?<=[.!?])\s+', text.strip())
-        return [s for s in sentences if s]
-
     def _generate_segment(self, segment_text: str, path: str):
         self.tts.tts_to_file(
             text=segment_text,
@@ -30,25 +26,23 @@ class VoiceGenerator:
         )
 
     async def stream_voice(self, text: str) -> AsyncGenerator[bytes, None]:
-        segments = self._split_text_into_sentences(text)
+        filename = f"{uuid.uuid4().hex}.wav"
+        filepath = os.path.join(os.getcwd(), filename)
 
-        for segment in segments:
-            filename = f"{uuid.uuid4().hex}.wav"
-            filepath = os.path.join(os.getcwd(), filename)
+        yield b""
 
-            try:
-                self._generate_segment(segment, filepath)
-
-                if not os.path.exists(filepath) or os.path.getsize(filepath) == 0:
-                    print(f"⚠️ Пропущен сегмент: {segment}")
-                    continue
-
-                with open(filepath, "rb") as f:
-                    while chunk := f.read(1024):
-                        yield chunk
-
-            except Exception as e:
-                print(f"❌ Ошибка генерации сегмента '{segment}': {e}")
-            finally:
-                if os.path.exists(filepath):
-                    os.remove(filepath)
+        try:
+            self.tts.tts_to_file(
+                text=text,
+                speaker_wav=self.speaker_wav,
+                language="ru",
+                file_path=filepath
+            )
+            with open(filepath, "rb") as f:
+                while chunk := f.read(1024):
+                    yield chunk
+        except Exception as e:
+            print(f"❌ Ошибка генерации: {e}")
+        finally:
+            if os.path.exists(filepath):
+                os.remove(filepath)

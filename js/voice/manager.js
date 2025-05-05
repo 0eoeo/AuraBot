@@ -46,6 +46,10 @@ async function joinVoice(message) {
     playNext();
   });
 
+  const textChannel = message.guild.channels.cache.find(
+    ch => ch.name === "герта" && ch.type === 0
+  );
+
   connection.receiver.speaking.on('start', userId => {
     handleAudio({
       connection,
@@ -53,7 +57,8 @@ async function joinVoice(message) {
       userId,
       playbackQueue,
       isPlaying,
-      playNext
+      playNext,
+      textChannel
     });
   });
 

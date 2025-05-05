@@ -1,7 +1,7 @@
 const prism = require('prism-media');
 const axios = require('axios');
 
-async function handleAudio({ connection, message, userId, playbackQueue, isPlaying, playNext }) {
+async function handleAudio({ connection, message, userId, playbackQueue, isPlaying, playNext, textChannel }) {
   const user = message.guild.members.cache.get(userId);
   if (!user || user.user.bot) return;
 
@@ -57,7 +57,14 @@ async function handleAudio({ connection, message, userId, playbackQueue, isPlayi
         return;
       }
 
-      playbackQueue.push({ stream: response.data });
+      const generatedText = response.headers['x-generated-text'];
+      console.log(`📢 Ответ бота: ${generatedText}`);
+
+      if (textChannel && generatedText) {
+        textChannel.send(`**Ответ для ${user.displayName}:** ${generatedText}`);
+      }
+
+      playbackQueue.push({ stream: response.data, text: generatedText });
 
       if (!isPlaying) {
         playNext();

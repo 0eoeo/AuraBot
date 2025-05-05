@@ -9,7 +9,6 @@ from pydantic import BaseModel
 from python.voice_generator.context_manager import ChatContextManager
 from python.voice_generator.voice_generator import VoiceGenerator
 from python.voice_generator.config import SPEAKER_WAV, ALLOWED_PHRASES, BLOCKED_PHRASES
-from python.voice_generator.state import BotState
 
 app = FastAPI()
 
@@ -18,8 +17,6 @@ voice_generator = VoiceGenerator(speaker_wav=SPEAKER_WAV)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 whisper_model = whisper.load_model("tiny", device=device)
 chat_context = ChatContextManager()
-speak_lock = BotState()
-
 
 class AudioRequest(BaseModel):
     audio: list[float]
@@ -44,23 +41,18 @@ async def recognize(request: Request, audio_data: AudioRequest):
         print("\u274C Заблокировано по ключевому слову.")
         return StreamingResponse(iter([]), media_type="audio/wav")
 
-    if await speak_lock.is_busy():
-        print("⏳ Бот говорит — новые реплики временно игнорируются.")
-        return StreamingResponse(iter([]), media_type="audio/wav")
-
     if any(phrase in text for phrase in ALLOWED_PHRASES):
         await chat_context.append(f"{speaker}: {text}")
         response_text = await chat_context.get_response()
 
         if response_text:
-            async def stream():
-                async for chunk in voice_generator.stream_voice(response_text):
-                    yield chunk
-
             return StreamingResponse(
-                speak_lock.wrap_stream(voice_generator.stream_voice(response_text)),
+                voice_generator.stream_voice(response_text),
                 media_type="audio/wav",
-                headers={"X-Content-Type-Options": "nosniff"}
+                headers={
+                    "X-Content-Type-Options": "nosniff",
+                    "X-Generated-Text": response_text  # 👈 Добавлено
+                }
             )
 
     return StreamingResponse(iter([]), media_type="audio/wav")
