@@ -21,6 +21,15 @@ async function handleAudio({ connection, message, userId, playbackQueue, isPlayi
 
   opusStream.pipe(pcmStream);
 
+  // Обработка ошибок потоков
+  opusStream.on('error', err => {
+    console.warn(`⚠️ Opus stream error: ${err.message}`);
+  });
+
+  pcmStream.on('error', err => {
+    console.warn(`⚠️ PCM decode error: ${err.message}`);
+  })
+
   const chunks = [];
 
   pcmStream.on('data', chunk => {
