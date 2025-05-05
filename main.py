@@ -27,6 +27,34 @@ def decode_speaker_name(encoded_name: str) -> str:
     except Exception:
         return "Бро"
 
+class TextRequest(BaseModel):
+    speaker: str
+    text: str
+
+@app.post("/reply")
+async def reply(text_req: TextRequest):
+    speaker = text_req.speaker.strip() or "Бро"
+    text = text_req.text.strip().lower()
+
+    print(f"💬 Сообщение от {speaker}: {text}")
+
+    await chat_context.append(f"{speaker}: {text}")
+    response_text = await chat_context.get_response()
+
+    if response_text:
+        encoded = base64.b64encode(response_text.encode("utf-8")).decode("ascii")
+        return StreamingResponse(
+            voice_generator.stream_voice(response_text),
+            media_type="audio/wav",
+            headers={
+                "X-Generated-Text": encoded,
+                "X-Content-Type-Options": "nosniff"
+            }
+        )
+
+    return StreamingResponse(iter([b""]), media_type="audio/wav")
+
+
 @app.post("/recognize")
 async def recognize(request: Request, audio_data: AudioRequest):
     speaker_b64 = request.headers.get("X-Speaker-Name")
@@ -39,20 +67,21 @@ async def recognize(request: Request, audio_data: AudioRequest):
 
     if any(phrase in text for phrase in BLOCKED_PHRASES):
         print("\u274C Заблокировано по ключевому слову.")
-        return StreamingResponse(iter([]), media_type="audio/wav")
+        return StreamingResponse(iter([b""]), media_type="audio/wav")
 
     if any(phrase in text for phrase in ALLOWED_PHRASES):
         await chat_context.append(f"{speaker}: {text}")
         response_text = await chat_context.get_response()
 
         if response_text:
+            encoded = base64.b64encode(response_text.encode("utf-8")).decode("ascii")
             return StreamingResponse(
                 voice_generator.stream_voice(response_text),
                 media_type="audio/wav",
                 headers={
                     "X-Content-Type-Options": "nosniff",
-                    "X-Generated-Text": response_text  # 👈 Добавлено
+                    "X-Generated-Text": encoded
                 }
             )
 
-    return StreamingResponse(iter([]), media_type="audio/wav")
+    return StreamingResponse(iter([b""]), media_type="audio/wav")
