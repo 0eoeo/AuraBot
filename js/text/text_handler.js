@@ -24,9 +24,15 @@ async function handleTextMessage(message, playbackQueue, isPlaying, playNext) {
     }
 
     const encodedText = response.headers['x-generated-text'];
-    const replyText = encodedText
-      ? Buffer.from(encodedText, 'base64').toString('utf-8')
-      : null;
+    let replyText = null;
+    if (encodedText) {
+      try {
+        replyText = Buffer.from(encodedText, 'base64').toString('utf-8');
+        console.log('✅ Раскодированный текст:', replyText);
+      } catch (e) {
+        console.error('❌ Ошибка декодирования Base64:', e);
+      }
+    }
 
     if (replyText) {
       await message.channel.send(`**Ответ:** ${replyText}`);
