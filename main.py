@@ -5,6 +5,7 @@ import whisper
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from scipy.signal import resample
 
 from python.voice_generator.context_manager import ChatContextManager
 from python.voice_generator.voice_generator import VoiceGenerator
@@ -68,8 +69,11 @@ async def recognize(request: Request, audio_data: AudioRequest):
     speaker_b64 = request.headers.get("X-Speaker-Name")
     speaker = decode_speaker_name(speaker_b64) if speaker_b64 else "Бро"
 
-    audio_np = np.array(audio_data.audio, dtype=np.float32)
-    result = whisper_model.transcribe(audio_np, language="ru")
+    float_array = np.array(audio_data.audio, dtype=np.float32)
+    target_len = int(len(float_array) * 16000 / 48000)
+    audio_16k = resample(float_array, target_len)
+
+    result = whisper_model.transcribe(audio_16k, language="ru")
     text = result.get("text", "").strip().lower()
     print(f"🎤 Распознанный текст от {speaker}: {text}")
 

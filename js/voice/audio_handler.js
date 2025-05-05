@@ -1,48 +1,33 @@
 const prism = require('prism-media');
 const axios = require('axios');
 const { EndBehaviorType } = require('@discordjs/voice');
+const fs = require('fs');
+const wav = require('wav');
 
 async function handleAudio({ connection, message, userId, playbackQueue, isPlaying, playNext, textChannel }) {
   const user = message.guild.members.cache.get(userId);
   if (!user || user.user.bot) return;
 
   const opusStream = connection.receiver.subscribe(userId, {
-      end: {
-        behavior: EndBehaviorType.AfterSilence,
-        duration: 500
-      }
-    });
-
-    opusStream.on('error', err => {
-      console.warn(`⚠️ Opus stream error from ${userId}: ${err.message}`);
-    });
-
-    const pcmStream = new prism.opus.Decoder({
-      frameSize: 960,
-      channels: 1,
-      rate: 48000
-    });
-
-    pcmStream.on('error', err => {
-      console.warn(`⚠️ PCM decode error from ${userId}: ${err.message}`);
-    });
-
-    opusStream.pipe(pcmStream);
-
-  // Обработка ошибок потоков
-  opusStream.on('error', err => {
-    console.warn(`⚠️ Opus stream error: ${err.message}`);
+    end: {
+      behavior: EndBehaviorType.AfterSilence,
+      duration: 500
+    }
   });
 
-  pcmStream.on('error', err => {
-    console.warn(`⚠️ PCM decode error: ${err.message}`);
-  })
+  const pcmStream = new prism.opus.Decoder({
+    frameSize: 960,
+    channels: 1,
+    rate: 48000
+  });
+
+  opusStream.on('error', err => console.warn(`⚠️ Opus stream error: ${err.message}`));
+  pcmStream.on('error', err => console.warn(`⚠️ PCM decode error: ${err.message}`));
+
+  opusStream.pipe(pcmStream);
 
   const chunks = [];
-
-  pcmStream.on('data', chunk => {
-    chunks.push(chunk);
-  });
+  pcmStream.on('data', chunk => chunks.push(chunk));
 
   pcmStream.on('end', async () => {
     if (chunks.length === 0) return;
@@ -53,6 +38,18 @@ async function handleAudio({ connection, message, userId, playbackQueue, isPlayi
     const float32Array = new Float32Array(buffer.length / 2);
     for (let i = 0; i < buffer.length; i += 2) {
       float32Array[i / 2] = buffer.readInt16LE(i) / 32768;
+    }
+
+    // DEBUG: save audio to wav (optional)
+    const saveDebugWav = false;
+    if (saveDebugWav) {
+      const writer = new wav.FileWriter(`./debug_${Date.now()}.wav`, {
+        channels: 1,
+        sampleRate: 48000,
+        bitDepth: 16
+      });
+      writer.write(buffer);
+      writer.end();
     }
 
     const payload = {
