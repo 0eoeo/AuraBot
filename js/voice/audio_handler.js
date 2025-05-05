@@ -2,7 +2,6 @@ const prism = require('prism-media');
 const axios = require('axios');
 const { EndBehaviorType } = require('@discordjs/voice');
 const fs = require('fs');
-const wav = require('wav');
 
 async function handleAudio({ connection, message, userId, playbackQueue, isPlaying, playNext, textChannel }) {
   const user = message.guild.members.cache.get(userId);
@@ -38,18 +37,6 @@ async function handleAudio({ connection, message, userId, playbackQueue, isPlayi
     const float32Array = new Float32Array(buffer.length / 2);
     for (let i = 0; i < buffer.length; i += 2) {
       float32Array[i / 2] = buffer.readInt16LE(i) / 32768;
-    }
-
-    // DEBUG: save audio to wav (optional)
-    const saveDebugWav = false;
-    if (saveDebugWav) {
-      const writer = new wav.FileWriter(`./debug_${Date.now()}.wav`, {
-        channels: 1,
-        sampleRate: 48000,
-        bitDepth: 16
-      });
-      writer.write(buffer);
-      writer.end();
     }
 
     const payload = {
