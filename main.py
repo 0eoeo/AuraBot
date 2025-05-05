@@ -29,14 +29,12 @@ class VoiceRequest(BaseModel):
 class AudioRequest(BaseModel):
     audio: list[float]
 
-# --- Вспомогательная функция ---
 def decode_speaker_name(encoded_name: str) -> str:
     try:
         return base64.b64decode(encoded_name).decode("utf-8")
     except Exception:
         return "Бро"
 
-# --- Ручка для получения ТЕКСТОВОГО ответа ---
 @app.post("/reply")
 async def reply(text_req: TextRequest):
     speaker = text_req.speaker.strip() or "Бро"
@@ -48,7 +46,6 @@ async def reply(text_req: TextRequest):
 
     return {"text": response_text or ""}
 
-# --- Ручка для получения ГОЛОСОВОГО ответа ---
 @app.post("/voice")
 async def voice(voice_req: VoiceRequest):
     text = voice_req.text.strip()
@@ -61,7 +58,6 @@ async def voice(voice_req: VoiceRequest):
         headers={"X-Content-Type-Options": "nosniff"}
     )
 
-# --- Ручка для распознавания речи через Whisper ---
 @app.post("/recognize")
 async def recognize(request: Request, audio_data: AudioRequest):
     speaker_b64 = request.headers.get("X-Speaker-Name")

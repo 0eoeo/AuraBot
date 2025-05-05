@@ -8,7 +8,6 @@ async function handleTextMessage(message, playbackQueue, isPlaying, playNext) {
   const text = message.content;
 
   try {
-    // 1. Получаем текст от API (/reply)
     const replyResponse = await axios.post('http://localhost:8000/reply', {
       speaker: message.member.displayName,
       text
@@ -24,9 +23,8 @@ async function handleTextMessage(message, playbackQueue, isPlaying, playNext) {
     }
 
     console.log("✅ Текст ответа:", replyText);
-    await message.reply(`**Ответ:** ${replyText}`);  // <-- отвечает на сообщение
+    await message.reply(`${replyText}`);  // <-- отвечает на сообщение
 
-    // 2. Проверяем: находится ли бот в голосовом канале
     const botVoiceChannel = message.guild.members.me.voice.channel;
 
     if (!botVoiceChannel) {
@@ -34,7 +32,6 @@ async function handleTextMessage(message, playbackQueue, isPlaying, playNext) {
       return;  // только текст
     }
 
-    // 3. Получаем озвучку от /voice
     const voiceResponse = await axios.post('http://localhost:8000/voice', {
       text: replyText
     }, {

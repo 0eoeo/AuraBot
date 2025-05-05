@@ -31,7 +31,7 @@ async function joinVoice(message) {
     }
 
     isPlaying = true;
-    const { stream } = playbackQueue.shift();
+    const { stream, text } = playbackQueue.shift();
 
     const resource = createAudioResource(stream, {
       inputType: StreamType.Arbitrary
@@ -50,6 +50,10 @@ async function joinVoice(message) {
   const textChannel = message.guild.channels.cache.find(
     ch => ch.name === "герта" && ch.type === 0
   );
+
+  if (text && textChannel) {
+    textChannel.send(`${text}`).catch(console.error);
+  }
 
   connection.receiver.speaking.on('start', userId => {
     handleAudio({
