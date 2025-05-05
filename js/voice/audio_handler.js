@@ -7,19 +7,27 @@ async function handleAudio({ connection, message, userId, playbackQueue, isPlayi
   if (!user || user.user.bot) return;
 
   const opusStream = connection.receiver.subscribe(userId, {
-    end: {
-      behavior: EndBehaviorType.AfterSilence,
-      duration: 1000
-    }
-  });
+      end: {
+        behavior: EndBehaviorType.AfterSilence,
+        duration: 500
+      }
+    });
 
-  const pcmStream = new prism.opus.Decoder({
-    rate: 16000,
-    channels: 1,
-    frameSize: 960
-  });
+    opusStream.on('error', err => {
+      console.warn(`⚠️ Opus stream error from ${userId}: ${err.message}`);
+    });
 
-  opusStream.pipe(pcmStream);
+    const pcmStream = new prism.opus.Decoder({
+      frameSize: 960,
+      channels: 1,
+      rate: 48000
+    });
+
+    pcmStream.on('error', err => {
+      console.warn(`⚠️ PCM decode error from ${userId}: ${err.message}`);
+    });
+
+    opusStream.pipe(pcmStream);
 
   // Обработка ошибок потоков
   opusStream.on('error', err => {
@@ -42,7 +50,6 @@ async function handleAudio({ connection, message, userId, playbackQueue, isPlayi
     const buffer = Buffer.concat(chunks);
     if (buffer.length < 32000) return;
 
-    // Convert PCM Buffer to Float32Array
     const float32Array = new Float32Array(buffer.length / 2);
     for (let i = 0; i < buffer.length; i += 2) {
       float32Array[i / 2] = buffer.readInt16LE(i) / 32768;
