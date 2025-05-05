@@ -1,3 +1,4 @@
+process.stdout.setEncoding('utf8');
 const axios = require('axios');
 
 async function handleTextMessage(message, playbackQueue, isPlaying, playNext) {
