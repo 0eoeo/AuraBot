@@ -52,11 +52,16 @@ async def voice(voice_req: VoiceRequest):
     if not text:
         return StreamingResponse(iter([b""]), media_type="audio/wav")
 
+    encoded = base64.b64encode(text.encode("utf-8")).decode("ascii")
     return StreamingResponse(
         voice_generator.stream_voice(text),
         media_type="audio/wav",
-        headers={"X-Content-Type-Options": "nosniff"}
+        headers={
+            "X-Content-Type-Options": "nosniff",
+            "X-Generated-Text": encoded  # ⬅️ добавлено
+        }
     )
+
 
 @app.post("/recognize")
 async def recognize(request: Request, audio_data: AudioRequest):
