@@ -3,7 +3,7 @@ require('dotenv').config();
 
 const joinCommand = require('./js/commands/join');
 const leaveCommand = require('./js/commands/leave');
-const handleTextMessage = require('./js/commands/text_handler');
+const handleTextMessage = require('./js/text/text_handler');
 
 const client = new Client({
   intents: [
