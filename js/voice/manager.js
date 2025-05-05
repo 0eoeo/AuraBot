@@ -3,7 +3,8 @@ const {
   getVoiceConnection,
   createAudioPlayer,
   AudioPlayerStatus,
-  StreamType
+  StreamType,
+  createAudioResource
 } = require('@discordjs/voice');
 const { handleAudio } = require('./audio_handler');
 
@@ -32,7 +33,7 @@ async function joinVoice(message) {
     isPlaying = true;
     const { stream } = playbackQueue.shift();
 
-    const resource = require('@discordjs/voice').createAudioResource(stream, {
+    const resource = createAudioResource(stream, {
       inputType: StreamType.Arbitrary
     });
 
@@ -62,7 +63,20 @@ async function joinVoice(message) {
     });
   });
 
-  guildStates.set(guildId, { connection, player });
+  guildStates.set(guildId, {
+    connection,
+    player,
+    playbackQueue,
+    get isPlaying() {
+      return isPlaying;
+    },
+    set isPlaying(val) {
+      isPlaying = val;
+    },
+    playNext,
+    textChannel
+  });
+
   message.reply('✅ Подключился!');
 }
 
@@ -77,7 +91,12 @@ function leaveVoice(message) {
   message.reply('👋 Отключился.');
 }
 
+function getGuildState(guildId) {
+  return guildStates.get(guildId);
+}
+
 module.exports = {
   joinVoice,
-  leaveVoice
+  leaveVoice,
+  getGuildState
 };

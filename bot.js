@@ -1,16 +1,8 @@
 const { Client, GatewayIntentBits } = require('discord.js');
 require('dotenv').config();
 
-const joinCommand = require('./js/commands/join');
-const leaveCommand = require('./js/commands/leave');
+const { joinVoice, leaveVoice, getGuildState } = require('./js/voice/manager');
 const handleTextMessage = require('./js/text/text_handler');
-const {
-  playbackQueue,
-  isPlayingRef,
-  setIsPlaying,
-  playNext,
-  player
-} = require('./js/voice/manager');
 
 const client = new Client({
   intents: [
@@ -27,9 +19,23 @@ client.once('ready', () => {
 
 client.on('messageCreate', async message => {
   if (message.author.bot) return;
-  if (message.content === '!join') return joinCommand(message);
-  if (message.content === '!leave') return leaveCommand(message);
-  handleTextMessage(message, playbackQueue, isPlaying, playNext);
+
+  if (message.content === '!join') return joinVoice(message);
+  if (message.content === '!leave') return leaveVoice(message);
+
+  if (message.channel.name !== 'герта') return;
+
+  const state = getGuildState(message.guild.id);
+  if (!state) return;
+
+  const { playbackQueue, isPlaying, playNext } = state;
+
+  const wrappedPlayNext = () => {
+    state.isPlaying = true;
+    playNext();
+  };
+
+  handleTextMessage(message, playbackQueue, isPlaying, wrappedPlayNext);
 });
 
 client.login(process.env.BOT_TOKEN);
