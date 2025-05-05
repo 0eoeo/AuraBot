@@ -25,17 +25,19 @@ client.on('messageCreate', async message => {
 
   if (message.channel.name !== 'герта') return;
 
+  // Получаем состояние, даже если его нет — для передачи как undefined
   const state = getGuildState(message.guild.id);
-  if (!state) return;
-
-  const { playbackQueue, isPlaying, playNext } = state;
+  const { playbackQueue = [], isPlaying = false, playNext = () => {} } = state || {};
 
   const wrappedPlayNext = () => {
-    state.isPlaying = true;
-    playNext();
+    if (state) {
+      state.isPlaying = true;
+      playNext();
+    }
   };
 
   handleTextMessage(message, playbackQueue, isPlaying, wrappedPlayNext);
 });
+
 
 client.login(process.env.BOT_TOKEN);

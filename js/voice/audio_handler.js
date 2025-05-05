@@ -57,18 +57,28 @@ async function handleAudio({ connection, message, userId, playbackQueue, isPlayi
         return;
       }
 
-      const generatedText = response.headers['x-generated-text'];
-      console.log(`📢 Ответ бота: ${generatedText}`);
+      const generatedTextEncoded = response.headers['x-generated-text'];
+      let decodedText = null;
 
-      if (textChannel && generatedText) {
-        textChannel.send(`**Ответ для ${user.displayName}:** ${generatedText}`);
+      if (generatedTextEncoded) {
+        try {
+          decodedText = Buffer.from(generatedTextEncoded, 'base64').toString('utf-8');
+          console.log(`📢 Ответ бота: ${decodedText}`);
+        } catch (e) {
+          console.error('❌ Ошибка при декодировании ответа:', e);
+        }
       }
 
-      playbackQueue.push({ stream: response.data, text: generatedText });
+      if (textChannel && decodedText) {
+        textChannel.send(`**Ответ для ${user.displayName}:** ${decodedText}`);
+      }
+
+      playbackQueue.push({ stream: response.data, text: decodedText });
 
       if (!isPlaying) {
         playNext();
       }
+
     } catch (err) {
       console.error('❌ Ошибка при отправке аудио:', err.message);
     }

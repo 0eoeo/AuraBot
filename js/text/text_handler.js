@@ -1,4 +1,3 @@
-process.stdout.setEncoding('utf8');
 const axios = require('axios');
 
 async function handleTextMessage(message, playbackQueue, isPlaying, playNext) {
@@ -9,39 +8,46 @@ async function handleTextMessage(message, playbackQueue, isPlaying, playNext) {
   const text = message.content;
 
   try {
-    const response = await axios.post('http://localhost:8000/reply', {
+    // 1. Получаем текст от API (/reply)
+    const replyResponse = await axios.post('http://localhost:8000/reply', {
       speaker: message.member.displayName,
       text
     }, {
-      responseType: 'stream',
-      headers: { 'Content-Type': 'application/json' },
-      validateStatus: () => true
+      headers: { 'Content-Type': 'application/json' }
     });
 
-    if (response.status !== 200) {
-      console.error(`❌ Ошибка ответа API: ${response.status}`);
+    const replyText = replyResponse.data?.text?.trim();
+
+    if (!replyText) {
+      await message.reply("🤖 Бот не ответил.");
       return;
     }
 
-    const encodedText = response.headers['x-generated-text'];
-    let replyText = null;
-    if (encodedText) {
-      try {
-        replyText = Buffer.from(encodedText, 'base64').toString('utf-8');
-        console.log('✅ Раскодированный текст:', replyText);
-      } catch (e) {
-        console.error('❌ Ошибка декодирования Base64:', e);
-      }
+    console.log("✅ Текст ответа:", replyText);
+    await message.reply(`**Ответ:** ${replyText}`);  // <-- отвечает на сообщение
+
+    // 2. Проверяем: находится ли бот в голосовом канале
+    const botVoiceChannel = message.guild.members.me.voice.channel;
+
+    if (!botVoiceChannel) {
+      console.log("🎧 Бот не в голосовом канале. Пропускаем воспроизведение.");
+      return;  // только текст
     }
 
-    if (replyText) {
-      await message.channel.send(`**Ответ:** ${replyText}`);
-    }
+    // 3. Получаем озвучку от /voice
+    const voiceResponse = await axios.post('http://localhost:8000/voice', {
+      text: replyText
+    }, {
+      responseType: 'stream',
+      headers: { 'Content-Type': 'application/json' }
+    });
 
-    playbackQueue.push({ stream: response.data, text: replyText });
+    playbackQueue.push({ stream: voiceResponse.data, text: replyText });
     if (!isPlaying) playNext();
+
   } catch (err) {
-    console.error('❌ Ошибка при обращении к /reply:', err.message);
+    console.error('❌ Ошибка при обращении к API:', err.message);
+    await message.reply("⚠️ Произошла ошибка при запросе к API.");
   }
 }
 
