@@ -1,5 +1,6 @@
 const prism = require('prism-media');
 const axios = require('axios');
+const { EndBehaviorType } = require('@discordjs/voice');
 
 async function handleAudio({ connection, message, userId, playbackQueue, isPlaying, playNext, textChannel }) {
   const user = message.guild.members.cache.get(userId);
@@ -7,7 +8,7 @@ async function handleAudio({ connection, message, userId, playbackQueue, isPlayi
 
   const opusStream = connection.receiver.subscribe(userId, {
     end: {
-      behavior: require('@discordjs/voice').EndBehaviorType.AfterSilence,
+      behavior: EndBehaviorType.AfterSilence,
       duration: 1000
     }
   });
@@ -32,6 +33,7 @@ async function handleAudio({ connection, message, userId, playbackQueue, isPlayi
     const buffer = Buffer.concat(chunks);
     if (buffer.length < 32000) return;
 
+    // Convert PCM Buffer to Float32Array
     const float32Array = new Float32Array(buffer.length / 2);
     for (let i = 0; i < buffer.length; i += 2) {
       float32Array[i / 2] = buffer.readInt16LE(i) / 32768;
@@ -43,6 +45,7 @@ async function handleAudio({ connection, message, userId, playbackQueue, isPlayi
 
     try {
       const speakerName = Buffer.from(user.displayName, 'utf-8').toString('base64');
+
       const response = await axios.post('http://localhost:8000/recognize', payload, {
         responseType: 'stream',
         headers: {

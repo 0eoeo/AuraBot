@@ -25,7 +25,6 @@ client.on('messageCreate', async message => {
 
   if (message.channel.name !== 'герта') return;
 
-  // Получаем состояние, даже если его нет — для передачи как undefined
   const state = getGuildState(message.guild.id);
   const { playbackQueue = [], isPlaying = false, playNext = () => {} } = state || {};
 

@@ -12,10 +12,17 @@ const guildStates = new Map();
 
 async function joinVoice(message) {
   const guildId = message.guild.id;
-  if (guildStates.has(guildId)) return message.reply('Я уже подключён!');
+  if (guildStates.has(guildId)) {
+    return message.reply('Я уже подключён!');
+  }
+
+  const voiceChannel = message.member.voice.channel;
+  if (!voiceChannel) {
+    return message.reply('Сначала зайди в голосовой канал!');
+  }
 
   const connection = joinVoiceChannel({
-    channelId: message.member.voice.channel.id,
+    channelId: voiceChannel.id,
     guildId: guildId,
     adapterCreator: message.guild.voiceAdapterCreator
   });
@@ -31,7 +38,7 @@ async function joinVoice(message) {
     }
 
     isPlaying = true;
-    const { stream, text } = playbackQueue.shift();
+    const { stream } = playbackQueue.shift();
 
     const resource = createAudioResource(stream, {
       inputType: StreamType.Arbitrary
@@ -51,8 +58,8 @@ async function joinVoice(message) {
     ch => ch.name === "герта" && ch.type === 0
   );
 
-  if (text && textChannel) {
-    textChannel.send(`${text}`).catch(console.error);
+  if (!textChannel) {
+    console.warn('⚠️ Текстовый канал "герта" не найден.');
   }
 
   connection.receiver.speaking.on('start', userId => {
@@ -81,17 +88,20 @@ async function joinVoice(message) {
     textChannel
   });
 
-  message.reply('✅ Подключился!');
+  message.reply('✅ Подключился к голосовому каналу!');
 }
 
 function leaveVoice(message) {
   const guildId = message.guild.id;
   const state = guildStates.get(guildId);
-  if (!state) return message.reply('Я не в голосовом канале!');
+  if (!state) {
+    return message.reply('Я не в голосовом канале!');
+  }
 
   state.player.stop();
   state.connection.destroy();
   guildStates.delete(guildId);
+
   message.reply('👋 Отключился.');
 }
 

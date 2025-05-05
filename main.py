@@ -58,7 +58,7 @@ async def voice(voice_req: VoiceRequest):
         media_type="audio/wav",
         headers={
             "X-Content-Type-Options": "nosniff",
-            "X-Generated-Text": encoded  # ⬅️ добавлено
+            "X-Generated-Text": encoded
         }
     )
 
