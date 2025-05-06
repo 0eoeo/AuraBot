@@ -16,8 +16,10 @@ app = FastAPI()
 # Инициализация компонентов
 voice_generator = VoiceGenerator(speaker_wav=SPEAKER_WAV)
 device = "cuda" if torch.cuda.is_available() else "cpu"
-whisper_model = whisper.load_model("tiny", device=device)
 chat_context = ChatContextManager()
+
+# Переменная для хранения модели
+whisper_model = None
 
 # --- Модели запросов ---
 class TextRequest(BaseModel):
@@ -35,6 +37,14 @@ def decode_speaker_name(encoded_name: str) -> str:
         return base64.b64decode(encoded_name).decode("utf-8")
     except Exception:
         return "Бро"
+
+# Загрузка модели только при первом вызове метода /recognize
+def load_whisper_model():
+    global whisper_model
+    if whisper_model is None:
+        whisper_model = whisper.load_model("tiny", device=device)
+        print("💻 Модель Whisper загружена.")
+    return whisper_model
 
 @app.post("/reply")
 async def reply(text_req: TextRequest):
@@ -63,9 +73,11 @@ async def voice(voice_req: VoiceRequest):
         }
     )
 
-
 @app.post("/recognize")
 async def recognize(request: Request, audio_data: AudioRequest):
+    # Загружаем модель, если она ещё не была загружена
+    whisper_model = load_whisper_model()
+
     speaker_b64 = request.headers.get("X-Speaker-Name")
     speaker = decode_speaker_name(speaker_b64) if speaker_b64 else "Бро"
 
