@@ -14,7 +14,6 @@
   "name": "aurabot",
   "version": "1.0.0",
   "main": "bot.js",
-  "devDependencies": {},
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

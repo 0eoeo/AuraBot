@@ -13,6 +13,7 @@ torch.serialization.add_safe_globals([XttsConfig, XttsAudioConfig, BaseDatasetCo
 class VoiceGenerator:
     def __init__(self, speaker_wav: str):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        print(torch.cuda.is_available())
         self.speaker_wav = speaker_wav
 
         # Переменная для хранения экземпляра модели TTS
