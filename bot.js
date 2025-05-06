@@ -91,6 +91,10 @@ async function playMusicInVoiceChannel(url, message, voiceChannel) {
     const ytdlpProcess = spawn('yt-dlp', [
         '-f', 'bestaudio',
         '-o', '-',
+        '--retries', '10',
+        '--fragment-retries', '10',
+        '--socket-timeout', '15',
+        '--force-ipv4', // помогает при странном поведении IPv6
         url
     ]);
 
@@ -102,7 +106,9 @@ async function playMusicInVoiceChannel(url, message, voiceChannel) {
         'pipe:1'
     ]);
 
-    ytdlpProcess.stdout.pipe(ffmpegProcess.stdin);
+    ytdlpProcess.stdout.once('readable', () => {
+        ytdlpProcess.stdout.pipe(ffmpegProcess.stdin);
+    });
 
     ytdlpProcess.stderr.on('data', data => {
         console.error(`yt-dlp error: ${data}`);
