@@ -1,5 +1,5 @@
 from typing import AsyncGenerator
-
+from PyCharacterAI import get_client
 from TTS.api import TTS
 from TTS.tts.configs.xtts_config import XttsConfig, XttsAudioConfig
 from TTS.config.shared_configs import BaseDatasetConfig
@@ -7,6 +7,7 @@ from TTS.tts.models.xtts import XttsArgs
 import torch
 import uuid
 import os
+from ..config import CHARACTER_AI_TOKEN, CHARACTER_ID
 
 torch.serialization.add_safe_globals([XttsConfig, XttsAudioConfig, BaseDatasetConfig, XttsArgs])
 

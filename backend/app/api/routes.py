@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
+
 from ..models.request_models import *
 from ..services.chat_context import ChatContextManager
 from ..services.tts_generator import VoiceGenerator
@@ -8,7 +9,6 @@ from ..utils.speaker_utils import decode_speaker_name
 from ..config import *
 
 import numpy as np
-import os
 import base64
 
 router = APIRouter()
@@ -25,8 +25,7 @@ async def reply(text_req: TextRequest):
     text = text_req.text.strip().lower()
 
     print(f"💬 Сообщение от {speaker}: {text}")
-    await chat_context.append(f"{speaker}: {text}")
-    response_text = await chat_context.get_response()
+    response_text = await chat_context.get_response(text)
 
     return {"text": response_text or ""}
 
@@ -64,8 +63,7 @@ async def recognize(request: Request, audio_data: AudioRequest):
         return StreamingResponse(iter([b""]), media_type="audio/wav")
 
     if any(phrase in text for phrase in ALLOWED_PHRASES):
-        await chat_context.append(f"{speaker}: {text}")
-        response_text = await chat_context.get_response()
+        response_text = await chat_context.get_response(text)
 
         if response_text:
             return StreamingResponse(
