@@ -26,6 +26,7 @@ async def reply(text_req: TextRequest):
 
     print(f"💬 Сообщение от {speaker}: {text}")
     response_text = await chat_context.get_response(text)
+    print(f"💬 Сообщение от бота: {response_text}")
 
     return {"text": response_text or ""}
 

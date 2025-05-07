@@ -1,4 +1,6 @@
 import asyncio
+import re
+
 from PyCharacterAI import get_client
 from PyCharacterAI.exceptions import SessionClosedError
 from ..config import CHARACTER_AI_TOKEN, CHARACTER_ID
@@ -14,17 +16,16 @@ class ChatContextManager:
             self.client = await get_client(token=CHARACTER_AI_TOKEN)
             self.me = await self.client.account.fetch_me()
             chat, greeting_message = await self.client.chat.create_chat(CHARACTER_ID)
-
-            message = f"[{self.me.name}]: {user_text} Ответь на русском!"
+            message = f"[{self.me.name}]: {user_text} Отвечай только на русском языке!"
             msg = await self.client.chat.send_message(CHARACTER_ID, chat.chat_id, message)
-
-            candidate = msg.get_primary_candidate()
-            try:
-                text = str(candidate.text).split(": ", 1)[1]
-            except:
-                text = str(candidate.text)
-            print(text)
-            return msg.turn_id, candidate.candidate_id, text
+            response_text = msg.get_primary_candidate().text or ''
+            # Удаляем всё в квадратных скобках, включая скобки
+            cleaned_text = re.sub(r"\[.*?\]", "", response_text).strip()
+            # Убираем начальные двоеточия, если остались
+            cleaned_text = re.sub(r"^:+\s*", "", cleaned_text)
+            # Удаляем повторяющиеся пробелы
+            cleaned_text = re.sub(r"\s{2,}", " ", cleaned_text)
+            return cleaned_text
 
         except SessionClosedError:
             print("Session closed")
