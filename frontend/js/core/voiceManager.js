@@ -1,29 +1,24 @@
 const {
   joinVoiceChannel,
-  getVoiceConnection,
   createAudioPlayer,
+  createAudioResource,
   AudioPlayerStatus,
-  StreamType,
-  createAudioResource
+  StreamType
 } = require('@discordjs/voice');
-const { handleAudio } = require('./audio_handler');
+const handleAudio = require('./audioHandler');
 
 const guildStates = new Map();
 
 async function joinVoice(message) {
   const guildId = message.guild.id;
-  if (guildStates.has(guildId)) {
-    return message.reply('Я уже подключён!');
-  }
+  if (guildStates.has(guildId)) return message.reply('Я уже подключён!');
 
   const voiceChannel = message.member.voice.channel;
-  if (!voiceChannel) {
-    return message.reply('Сначала зайди в голосовой канал!');
-  }
+  if (!voiceChannel) return message.reply('Сначала зайди в голосовой канал!');
 
   const connection = joinVoiceChannel({
     channelId: voiceChannel.id,
-    guildId: guildId,
+    guildId,
     adapterCreator: message.guild.voiceAdapterCreator
   });
 
@@ -36,14 +31,9 @@ async function joinVoice(message) {
       isPlaying = false;
       return;
     }
-
     isPlaying = true;
     const { stream } = playbackQueue.shift();
-
-    const resource = createAudioResource(stream, {
-      inputType: StreamType.Arbitrary
-    });
-
+    const resource = createAudioResource(stream, { inputType: StreamType.Arbitrary });
     player.play(resource);
     connection.subscribe(player);
   }
@@ -54,36 +44,18 @@ async function joinVoice(message) {
     playNext();
   });
 
-  const textChannel = message.guild.channels.cache.find(
-    ch => ch.name === "герта" && ch.type === 0
-  );
-
-  if (!textChannel) {
-    console.warn('⚠️ Текстовый канал "герта" не найден.');
-  }
+  const textChannel = message.guild.channels.cache.find(ch => ch.name === 'герта' && ch.type === 0);
 
   connection.receiver.speaking.on('start', userId => {
-    handleAudio({
-      connection,
-      message,
-      userId,
-      playbackQueue,
-      isPlaying,
-      playNext,
-      textChannel
-    });
+    handleAudio({ connection, message, userId, playbackQueue, isPlaying, playNext, textChannel });
   });
 
   guildStates.set(guildId, {
     connection,
     player,
     playbackQueue,
-    get isPlaying() {
-      return isPlaying;
-    },
-    set isPlaying(val) {
-      isPlaying = val;
-    },
+    get isPlaying() { return isPlaying; },
+    set isPlaying(val) { isPlaying = val; },
     playNext,
     textChannel
   });
@@ -94,14 +66,10 @@ async function joinVoice(message) {
 function leaveVoice(message) {
   const guildId = message.guild.id;
   const state = guildStates.get(guildId);
-  if (!state) {
-    return message.reply('Я не в голосовом канале!');
-  }
-
+  if (!state) return message.reply('Я не в голосовом канале!');
   state.player.stop();
   state.connection.destroy();
   guildStates.delete(guildId);
-
   message.reply('👋 Отключился.');
 }
 
@@ -109,8 +77,4 @@ function getGuildState(guildId) {
   return guildStates.get(guildId);
 }
 
-module.exports = {
-  joinVoice,
-  leaveVoice,
-  getGuildState
-};
+module.exports = { joinVoice, leaveVoice, getGuildState };
