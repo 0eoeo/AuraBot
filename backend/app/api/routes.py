@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
+from speech_recognition.recognizers.whisper_api.groq import recognize
 
 from ..models.request_models import *
 from ..services.chat_context import ChatContextManager
 from ..services.tts_generator import VoiceGenerator
-from ..services.whisper_service import WhisperService
+from ..services.whisper_service import AzureSpeechService
 from ..utils.speaker_utils import decode_speaker_name
 from ..config import *
 
@@ -14,20 +15,16 @@ import base64
 router = APIRouter()
 
 # Инициализация компонентов
-voice_generator = VoiceGenerator(speaker_wav=SPEAKER_WAV)
+voice_generator = VoiceGenerator()
 chat_context = ChatContextManager()
-whisper_service = WhisperService()
+recognize_service = AzureSpeechService(subscription_key=TTS_KEY, region=REGION)
 
 
 @router.post("/reply")
 async def reply(text_req: TextRequest):
     speaker = text_req.speaker.strip() or "Бро"
     text = text_req.text.strip().lower()
-
-    print(f"💬 Сообщение от {speaker}: {text}")
-    response_text = await chat_context.get_response(text)
-    print(f"💬 Сообщение от бота: {response_text}")
-
+    response_text = await chat_context.get_response(f'[{speaker}]: {text}')
     return {"text": response_text or ""}
 
 
@@ -52,9 +49,8 @@ async def voice(voice_req: VoiceRequest):
 async def recognize(request: Request, audio_data: AudioRequest):
     speaker_b64 = request.headers.get("X-Speaker-Name")
     speaker = decode_speaker_name(speaker_b64) if speaker_b64 else "Бро"
-
     float_array = np.array(audio_data.audio, dtype=np.float32)
-    result = whisper_service.transcribe(float_array)
+    result = recognize_service.transcribe(float_array)
     text = result.strip().lower()
 
     print(f"🎤 Распознанный текст от {speaker}: {text}")
@@ -64,7 +60,7 @@ async def recognize(request: Request, audio_data: AudioRequest):
         return StreamingResponse(iter([b""]), media_type="audio/wav")
 
     if any(phrase in text for phrase in ALLOWED_PHRASES):
-        response_text = await chat_context.get_response(text)
+        response_text = await chat_context.get_response(f'[{speaker}]: {text}')
 
         if response_text:
             return StreamingResponse(
@@ -73,4 +69,4 @@ async def recognize(request: Request, audio_data: AudioRequest):
                 headers={"X-Content-Type-Options": "nosniff"}
             )
 
-    return StreamingResponse(iter([b""]), media_type="audio/wav")
+        return StreamingResponse(iter([b""]), media_type="audio/wav")

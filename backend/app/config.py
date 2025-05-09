@@ -7,12 +7,12 @@ dotenv_path = os.path.join(os.path.dirname(__file__), '..', '.env')
 load_dotenv(dotenv_path=dotenv_path)
 
 GIGACHAT_TOKEN = os.getenv("GIGACHAT_TOKEN")
-SPEAKER_WAV = "voice_banks/камелия.wav"
+SPEAKER = "ru-RU-SvetlanaNeural"
 BLOCKED_PHRASES = [
     "динамичная музыка", "смех", "включи музыку", "сыграй песню",
     "ах ах ах", "ух ух ух", "спокойная музыка", "редактор субтитров"
 ]
-ALLOWED_PHRASES = ["герт", "хонкай", "honkai"]
+ALLOWED_PHRASES = ["инлин", "вува", "сиськи", "элин"]
 
 OBSCENE_PATTERNS = [re.compile(r'\b((?:(?:(?:у|[нз]а|(?:хитро|не)?вз?[ыьъ]|с[ьъ]|'
                                r'(?:и|ра)[зс]ъ?|(?:о[тб]|п[оа]д)[ьъ]?|(?:\S(?=[а-яё]))+?'
@@ -28,15 +28,16 @@ OBSCENE_PATTERNS = [re.compile(r'\b((?:(?:(?:у|[нз]а|(?:хитро|не)?в�
                                r'].*?|ля[тд]ь|(?:[нз]а|по)х))\b', re.IGNORECASE)]
 
 OBSCENE_REPLACEMENTS = {
-    r"\bблядь\b": "блин",
-    r"\bсука\b": "милашка",
-    r"\bхуй\b": "мяу",
-    r"\bпиздец\b": "капец",
-    r"\bебать\b": "фигачить",
-    r"\bебан(ый|ая|ое|ые|уть)\b": "лучший в мире",
-    r"\bоху(е[нлн][а-я]*)\b": "офигенно",
-    r"\bёб твою мать\b": "твою ж дивизию"
+    re.compile(r"\bбляд\w*\b", flags=re.IGNORECASE): "солнце",
+    re.compile(r"\bсу(ч|к)\w*\b", flags=re.IGNORECASE): "милашка",
+    re.compile(r"\bх(у|у[йеёи])\w*\b", flags=re.IGNORECASE): "мрак",
+    re.compile(r"\bпизд\w*\b", flags=re.IGNORECASE): "кошмар",
+    re.compile(r"\bёб\w*\b", flags=re.IGNORECASE): "ой",
+    re.compile(r"\bеб\w*\b", flags=re.IGNORECASE): "ой",
+    re.compile(r"\bоху\w*\b", flags=re.IGNORECASE): "ого",
 }
 
 CHARACTER_AI_TOKEN = os.getenv("CHARACTER_AI_TOKEN")
 CHARACTER_ID = os.getenv("CHARACTER_ID")
+TTS_KEY = os.getenv("TTS_KEY")
+REGION = os.getenv("REGION")
