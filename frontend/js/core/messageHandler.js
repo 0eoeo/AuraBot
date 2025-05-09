@@ -1,32 +1,64 @@
-const { joinVoice, leaveVoice, getGuildState } = require('./voiceManager');
-const { handleTextMessage } = require('./textHandler');
+const { joinVoice, leaveVoice } = require('./voiceManager');
 const { playMusicInVoiceChannel, skipSong, stopMusic } = require('./audioPlayer');
+const { getUser, updateCoins, addCharacter, getCollection } = require('./db');
+const { handleCasino, handleCollection, handleCoin, handleBalance, handlePrize } = require('./characterHandler');
 
-async function handleCommand(message) {
-  const content = message.content.trim();
+const characters = [
+  { url: 'https://gif.guru/file/aHR0cHM6Ly9pLnBpbmltZy5jb20vb3JpZ2luYWxzL2FmL2UyLzUyL2FmZTI1MjRlMGM1MDQ3YTcwMjRmZjNlMzVjYzJiMDlkLmdpZg.mp4', rarity: 'Common', chance: 0.9 },
+  { url: 'https://gif.guru/file/aHR0cHM6Ly9pLnBpbmltZy5jb20vb3JpZ2luYWxzL2RlLzRlLzU3L2RlNGU1N2U0ZTJjZGY1M2RiYTg0YTAyNmZlNjEwODZlLmdpZg.mp4', rarity: 'Rare', chance: 0.08 },
+  { url: 'https://gif.guru/file/aHR0cHM6Ly9zdXJ2ZXltb25rZXktYXNzZXRzLnMzLmFtYXpvbmF3cy5jb20vc3VydmV5LzE1OTg3NzMzMS8zOGFjMmZjZi01YjQwLTRiNGYtOTc1ZC1kOWUyZjQwOTI3NmEuZ2lm.mp4', rarity: 'Epic', chance: 0.0198 },
+  { url: 'https://gif.guru/file/aHR0cHM6Ly9pLnBpbmltZy5jb20vb3JpZ2luYWxzLzI5LzAwLzkyLzI5MDA5MjBlMmFjMGEwYzhmMTZlYmE1M2M4MzczMTViLmdpZg.mp4', rarity: 'Legendary', chance: 0.0002 }
+];
 
-  if (content.startsWith('!play ')) {
-    const url = content.split(' ')[1];
-    return playMusicInVoiceChannel(url, message);
+async function handleInteraction(interaction) {
+  const { commandName } = interaction;
+
+  if (commandName === 'coin') {
+    const amount = interaction.options.getInteger('amount');
+    const user = interaction.options.getUser('user');
+
+    // Логика перевода монет
+    await interaction.reply(`${interaction.user.username} перевел(а) ${amount} монет(ы) пользователю ${user.username}.`);
   }
-  if (content === '!skip') return skipSong(message);
-  if (content === '!stop') return stopMusic(message);
-  if (content === '!join') return joinVoice(message);
-  if (content === '!leave') return leaveVoice(message);
 
-  if (message.channel.name === 'герта') {
-    const state = getGuildState(message.guild.id);
-    const { playbackQueue = [], isPlaying = false, playNext = () => {} } = state || {};
+  // Для обработки команд через обычные сообщения
+  if (commandName === 'play') {
+    const url = interaction.options.getString('url'); // Предположим, что это строка URL
+    return playMusicInVoiceChannel(url, interaction);
+  }
 
-    const wrappedPlayNext = () => {
-      if (state) {
-        state.isPlaying = true;
-        playNext();
-      }
-    };
+  if (commandName === 'skip') {
+    return skipSong(interaction);
+  }
 
-    handleTextMessage(message, playbackQueue, isPlaying, wrappedPlayNext);
+  if (commandName === 'stop') {
+    return stopMusic(interaction);
+  }
+
+  // Обработка других команд
+  if (commandName === 'join') {
+    return joinVoice(interaction);
+  }
+
+  if (commandName === 'leave') {
+    return leaveVoice(interaction);
+  }
+
+  if (commandName === 'casino') {
+    return handleCasino(interaction);
+  }
+
+  if (commandName === 'collection') {
+    return handleCollection(interaction);
+  }
+
+  if (commandName === 'balance') {
+    return handleBalance(interaction);
+  }
+
+  if (commandName === 'prize') {
+    return handlePrize(interaction);
   }
 }
 
-module.exports = { handleCommand };
+module.exports = { handleInteraction };
