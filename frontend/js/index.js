@@ -42,19 +42,25 @@ client.on('messageCreate', async (message) => {
 });
 
 client.on('interactionCreate', async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
+
   try {
-     if (interaction.isChatInputCommand()) {
-        await handleInteraction(interaction);
-       }
-     }
-  catch (error) {
+    await interaction.deferReply(); // безопасный вариант, если обработка может занять время
+    await handleInteraction(interaction); // ваша логика
+  } catch (error) {
     console.error('❌ Ошибка обработки команды:', error);
-    if (interaction.replied || interaction.deferred) {
-        await interaction.followUp('Произошла ошибка при выполнении команды.');
+
+    try {
+      if (interaction.deferred || interaction.replied) {
+        await interaction.followUp({ content: 'Произошла ошибка при выполнении команды.', ephemeral: true });
       } else {
-        await interaction.reply('Произошла ошибка при выполнении команды.');
+        await interaction.reply({ content: 'Произошла ошибка при выполнении команды.', ephemeral: true });
       }
+    } catch (replyError) {
+      console.error('⚠️ Ошибка при отправке follow-up ответа:', replyError);
+    }
   }
 });
+
 
 client.login(process.env.BOT_TOKEN);
