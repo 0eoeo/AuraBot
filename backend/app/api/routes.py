@@ -1,6 +1,7 @@
+import base64
+import numpy as np
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
-from speech_recognition.recognizers.whisper_api.groq import recognize
 
 from ..models.request_models import *
 from ..services.chat_context import ChatContextManager
@@ -9,8 +10,6 @@ from ..services.whisper_service import AzureSpeechService
 from ..utils.speaker_utils import decode_speaker_name
 from ..config import *
 
-import numpy as np
-import base64
 
 router = APIRouter()
 
