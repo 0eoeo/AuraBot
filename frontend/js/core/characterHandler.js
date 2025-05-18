@@ -112,8 +112,10 @@ async function handleCasino(interaction) {
 
 async function handleCollection(interaction) {
   try {
+    await interaction.deferReply(); // добавить это в начало
+
     const rows = await getUserCollection(interaction.user.id);
-    if (rows.length === 0) return interaction.reply('Коллекция пуста.');
+    if (rows.length === 0) return interaction.editReply('Коллекция пуста.');
 
     for (const row of rows) {
       const char = characters.find(c => c.name === row.character);
@@ -128,11 +130,15 @@ async function handleCollection(interaction) {
       await interaction.channel.send({ embeds: [embed] });
     }
 
-    await interaction.reply('📦 Ваша коллекция:');
+    await interaction.editReply('📦 Ваша коллекция:');
 
   } catch (err) {
     console.error('❌ Ошибка получения коллекции:', err);
-    interaction.reply('Ошибка при получении коллекции.');
+    if (interaction.deferred || interaction.replied) {
+      await interaction.followUp('Ошибка при получении коллекции.');
+    } else {
+      await interaction.reply('Ошибка при получении коллекции.');
+    }
   }
 }
 
