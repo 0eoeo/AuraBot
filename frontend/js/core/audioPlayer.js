@@ -21,7 +21,14 @@ async function playMusicInVoiceChannel(url, interaction) {
   });
 
   const ytdlp = spawn('yt-dlp', ['-f', 'bestaudio', '-o', '-', url]);
+  ytdlp.stderr.on('data', data => {
+    console.error(`yt-dlp error: ${data.toString()}`);
+  });
+
   const ffmpegProcess = spawn(ffmpeg, ['-i', 'pipe:0', '-f', 's16le', '-ar', '48000', '-ac', '2', 'pipe:1']);
+  ffmpegProcess.stderr.on('data', data => {
+    console.error(`ffmpeg error: ${data.toString()}`);
+  });
 
   ytdlp.stdout.pipe(ffmpegProcess.stdin);
 
