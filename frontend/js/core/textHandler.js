@@ -5,7 +5,7 @@ async function handleTextMessage(message, playbackQueue, isPlaying, playNext) {
   const text = message.content;
 
   try {
-    const replyResponse = await axios.post('http://localhost:8000/reply', {
+    const replyResponse = await axios.post('https://aurabot-1.onrender.com/reply', {
       speaker: message.member.displayName,
       text
     });
@@ -18,7 +18,7 @@ async function handleTextMessage(message, playbackQueue, isPlaying, playNext) {
     const botVoiceChannel = message.guild.members.me.voice.channel;
     if (!botVoiceChannel) return;
 
-    const voiceResponse = await axios.post('http://localhost:8000/voice', {
+    const voiceResponse = await axios.post('https://aurabot-1.onrender.com/voice', {
       text: replyText
     }, { responseType: 'stream' });
 

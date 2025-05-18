@@ -28,7 +28,7 @@ module.exports = async function handleAudio({ connection, message, userId, playb
 
     try {
       const speakerName = Buffer.from(user.displayName, 'utf-8').toString('base64');
-      const response = await axios.post('http://localhost:8000/recognize', {
+      const response = await axios.post('https://aurabot-1.onrender.com/recognize', {
         audio: Array.from(float32Array)
       }, {
         responseType: 'stream',
