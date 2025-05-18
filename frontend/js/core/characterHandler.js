@@ -3,30 +3,10 @@ const { EmbedBuilder } = require('discord.js');
 const PRICE = 100;
 
 const characters = [
-  {
-    name: 'Сопля',
-    rarity: 'Common',
-    chance: 0.9,
-    preview: 'https://i.pinimg.com/originals/ff/98/6c/ff986c4116c1551007ff0152e2a4d85e.gif',
-  },
-  {
-    name: 'Птичка',
-    rarity: 'Rare',
-    chance: 0.07,
-    preview: 'https://i.pinimg.com/originals/af/e2/52/afe2524e0c5047a7024ff3e35cc2b09d.gif',
-  },
-  {
-    name: 'Лисичка',
-    rarity: 'Epic',
-    chance: 0.02,
-    preview: 'https://i.pinimg.com/originals/de/4e/57/de4e57e4e2cdf53dba84a026fe61086e.gif',
-  },
-  {
-    name: 'Кошька',
-    rarity: 'Legendary',
-    chance: 0.01,
-    preview: 'https://i.pinimg.com/originals/a6/c2/f0/a6c2f03d5f21dbd24166ba8211366f74.gif',
-  },
+  { name: 'Сопля', rarity: 'Common', chance: 0.9, preview: 'https://i.pinimg.com/originals/ff/98/6c/ff986c4116c1551007ff0152e2a4d85e.gif' },
+  { name: 'Птичка', rarity: 'Rare', chance: 0.07, preview: 'https://i.pinimg.com/originals/af/e2/52/afe2524e0c5047a7024ff3e35cc2b09d.gif' },
+  { name: 'Лисичка', rarity: 'Epic', chance: 0.02, preview: 'https://i.pinimg.com/originals/de/4e/57/de4e57e4e2cdf53dba84a026fe61086e.gif' },
+  { name: 'Кошька', rarity: 'Legendary', chance: 0.01, preview: 'https://i.pinimg.com/originals/a6/c2/f0/a6c2f03d5f21dbd24166ba8211366f74.gif' },
 ];
 
 function getRarityColor(rarity) {
@@ -59,10 +39,7 @@ async function getRandomCharacter(userId) {
 
   const updatedCharacters = characters.map(char => {
     const bonus = (rarityCounts[char.rarity] || 0) * 0.01;
-    return {
-      ...char,
-      chance: Math.min(char.chance + bonus, 1),
-    };
+    return { ...char, chance: Math.min(char.chance + bonus, 1) };
   });
 
   const totalChance = updatedCharacters.reduce((sum, c) => sum + c.chance, 0);
@@ -76,6 +53,7 @@ async function getRandomCharacter(userId) {
     sum += char.chance;
     if (rand < sum) return char;
   }
+
   return normalizedCharacters[0];
 }
 
@@ -96,7 +74,7 @@ async function handleCasino(interaction) {
     const character = await getRandomCharacter(userId);
 
     await new Promise((resolve, reject) => {
-      updateCoins(userId, -PRICE, (err) => err ? reject(err) : resolve());
+      updateCoins(userId, -PRICE, err => err ? reject(err) : resolve());
     });
 
     const rows = await getUserCollection(userId);
@@ -115,7 +93,7 @@ async function handleCasino(interaction) {
 
     if (!alreadyOwned) {
       await new Promise((resolve, reject) => {
-        addCharacter(userId, character.name, character.rarity, character.preview, (err) => {
+        addCharacter(userId, character.name, character.rarity, character.preview, err => {
           if (err) return reject('Ошибка добавления персонажа.');
           resolve();
         });
@@ -135,7 +113,6 @@ async function handleCasino(interaction) {
 async function handleCollection(interaction) {
   try {
     const rows = await getUserCollection(interaction.user.id);
-
     if (rows.length === 0) return interaction.reply('Коллекция пуста.');
 
     for (const row of rows) {
@@ -227,34 +204,38 @@ async function handlePrize(interaction) {
   }
 }
 
-// Функция запуска таймера — начисляет монеты пользователям, находящимся в голосовом канале
-function startVoiceCoinsTask(client, guildId, voiceChannelId) {
+// ✅ Обновлённая функция начисления монет всем участникам во всех голосовых каналах
+function startVoiceCoinsTask(client, guildId) {
   setInterval(async () => {
     try {
       const guild = await client.guilds.fetch(guildId);
       if (!guild) return;
 
-      const voiceChannel = guild.channels.cache.get(voiceChannelId);
-      if (!voiceChannel || !voiceChannel.isVoiceBased()) {
-        console.warn('Голосовой канал не найден или неверного типа');
-        return;
+      let total = 0;
+
+      for (const [, channel] of guild.channels.cache) {
+        if (channel.isVoiceBased()) {
+          for (const [memberId, member] of channel.members) {
+            if (member.user.bot) continue;
+
+            await new Promise((resolve, reject) => {
+              updateCoins(memberId, 1, err => {
+                if (err) {
+                  console.error(`Ошибка начисления монет пользователю ${memberId}:`, err);
+                  return reject(err);
+                }
+                resolve();
+              });
+            });
+
+            total++;
+          }
+        }
       }
 
-      const members = voiceChannel.members;
-
-      for (const [memberId] of members) {
-        await new Promise((resolve, reject) => {
-          updateCoins(memberId, 1, err => {
-            if (err) {
-              console.error(`Ошибка начисления монет пользователю ${memberId}:`, err);
-              return reject(err);
-            }
-            resolve();
-          });
-        });
+      if (total > 0) {
+        console.log(`✅ Начислено 1 монету каждому из ${total} участников голосовых каналов.`);
       }
-
-      console.log(`Начислено 1 монету ${members.size} пользователям в голосовом канале ${voiceChannel.name}`);
 
     } catch (error) {
       console.error('Ошибка в startVoiceCoinsTask:', error);
