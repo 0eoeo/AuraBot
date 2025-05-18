@@ -33,7 +33,7 @@ async function playMusicInVoiceChannel(url, interaction) {
       adapterCreator: interaction.guild.voiceAdapterCreator
     });
 
-    const ytdlp = spawn('yt-dlp', ['-f', 'bestaudio', '-o', '-', url]);
+    const ytdlp = spawn('yt-dlp', ['--cookies-from-browser', 'chrome', '-f', 'bestaudio', '-o', '-', url]);
     ytdlp.stderr.on('data', data => {
       console.error(`yt-dlp error: ${data.toString()}`);
     });
