@@ -13,14 +13,14 @@ async function playMusicInVoiceChannel(url, interaction) {
     const voiceChannel = interaction.member.voice.channel;
     if (!voiceChannel) {
       if (!interaction.replied && !interaction.deferred) {
-        await interaction.reply('🔇 Ты должен быть в голосовом канале!');
+        await interaction.reply({ content: '🔇 Ты должен быть в голосовом канале!', ephemeral: true });
       } else {
         await interaction.editReply('🔇 Ты должен быть в голосовом канале!');
       }
       return;
     }
 
-    // Сразу откладываем ответ, чтобы Discord не посчитал интеракцию просроченной
+    // Если интеракция ещё не обработана — откладываем ответ сразу
     if (!interaction.deferred && !interaction.replied) {
       await interaction.deferReply();
     }
@@ -31,13 +31,12 @@ async function playMusicInVoiceChannel(url, interaction) {
       adapterCreator: interaction.guild.voiceAdapterCreator
     });
 
-    // Запускаем yt-dlp для получения аудио потока
-    const ytdlp = spawn('yt-dlp', ['--cookies-from-browser', 'chrome', '-f', 'bestaudio', '-o', '-', url]);
+    // yt-dlp без куки, если нужен доступ — надо прокинуть куки корректно
+    const ytdlp = spawn('yt-dlp', ['-f', 'bestaudio', '-o', '-', url]);
     ytdlp.stderr.on('data', data => {
       console.error(`yt-dlp error: ${data.toString()}`);
     });
 
-    // Прогоняем через ffmpeg, чтобы преобразовать аудио в нужный формат
     const ffmpegProcess = spawn(ffmpeg, [
       '-i', 'pipe:0',
       '-f', 's16le',
@@ -51,10 +50,7 @@ async function playMusicInVoiceChannel(url, interaction) {
 
     ytdlp.stdout.pipe(ffmpegProcess.stdin);
 
-    const resource = createAudioResource(ffmpegProcess.stdout, {
-      inputType: StreamType.Raw
-    });
-
+    const resource = createAudioResource(ffmpegProcess.stdout, { inputType: StreamType.Raw });
     const player = createAudioPlayer();
     connection.subscribe(player);
     player.play(resource);
@@ -69,16 +65,19 @@ async function playMusicInVoiceChannel(url, interaction) {
     });
 
     player.on('error', error => {
-      console.error('🎧 Ошибка проигрывания:', error.message);
+      console.error('Ошибка проигрывания:', error.message);
       if (connection.state.status !== 'destroyed') connection.destroy();
     });
 
-    // После того, как deferred ответ отправлен, редактируем его
+    // После deferReply редактируем ответ, чтобы показать, что всё запустилось
     if (interaction.deferred && !interaction.replied) {
       await interaction.editReply('🎶 Воспроизвожу музыку!');
     }
+
   } catch (error) {
     console.error('Ошибка в playMusicInVoiceChannel:', error);
+
+    // Попытка отправить сообщение об ошибке только если ещё не было ответа
     try {
       if (!interaction.replied && !interaction.deferred) {
         await interaction.reply({ content: 'Произошла ошибка при воспроизведении музыки.', ephemeral: true });
