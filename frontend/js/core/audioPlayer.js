@@ -12,17 +12,15 @@ async function playMusicInVoiceChannel(url, interaction) {
   try {
     const voiceChannel = interaction.member.voice.channel;
     if (!voiceChannel) {
-      // Если интеракция еще не была отвечена, отвечаем
       if (!interaction.replied && !interaction.deferred) {
         await interaction.reply('🔇 Ты должен быть в голосовом канале!');
       } else {
-        // Если уже отвечали, то просто редактируем или ничего не делаем
         await interaction.editReply('🔇 Ты должен быть в голосовом канале!');
       }
       return;
     }
 
-    // Деферим ответ, чтобы Discord не закрыл интеракцию
+    // Сразу откладываем ответ, чтобы Discord не посчитал интеракцию просроченной
     if (!interaction.deferred && !interaction.replied) {
       await interaction.deferReply();
     }
@@ -33,11 +31,13 @@ async function playMusicInVoiceChannel(url, interaction) {
       adapterCreator: interaction.guild.voiceAdapterCreator
     });
 
+    // Запускаем yt-dlp для получения аудио потока
     const ytdlp = spawn('yt-dlp', ['--cookies-from-browser', 'chrome', '-f', 'bestaudio', '-o', '-', url]);
     ytdlp.stderr.on('data', data => {
       console.error(`yt-dlp error: ${data.toString()}`);
     });
 
+    // Прогоняем через ffmpeg, чтобы преобразовать аудио в нужный формат
     const ffmpegProcess = spawn(ffmpeg, [
       '-i', 'pipe:0',
       '-f', 's16le',
@@ -73,8 +73,8 @@ async function playMusicInVoiceChannel(url, interaction) {
       if (connection.state.status !== 'destroyed') connection.destroy();
     });
 
-    // Редактируем ответ, если интеракция не была ранее ответом
-    if (!interaction.replied) {
+    // После того, как deferred ответ отправлен, редактируем его
+    if (interaction.deferred && !interaction.replied) {
       await interaction.editReply('🎶 Воспроизвожу музыку!');
     }
   } catch (error) {
@@ -91,19 +91,4 @@ async function playMusicInVoiceChannel(url, interaction) {
   }
 }
 
-function skipSong(message) {
-  const state = require('./voiceManager').getGuildState(message.guild.id);
-  if (!state) return message.reply('❗ В очереди нет музыки для пропуска.');
-  state.player.stop();
-  message.reply('⏩ Песня пропущена!');
-}
-
-function stopMusic(message) {
-  const state = require('./voiceManager').getGuildState(message.guild.id);
-  if (!state) return message.reply('❗ Нет музыки для остановки.');
-  state.playbackQueue = [];
-  state.player.stop();
-  message.reply('⏹️ Музыка остановлена!');
-}
-
-module.exports = { playMusicInVoiceChannel, skipSong, stopMusic };
+module.exports = { playMusicInVoiceChannel };
