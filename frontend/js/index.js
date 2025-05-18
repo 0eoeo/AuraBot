@@ -45,22 +45,21 @@ client.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
   try {
-    await interaction.deferReply(); // безопасный вариант, если обработка может занять время
-    await handleInteraction(interaction); // ваша логика
+    await interaction.deferReply({ ephemeral: true }); // безопасно "замораживает" интеракцию
+    await handleInteraction(interaction);
   } catch (error) {
     console.error('❌ Ошибка обработки команды:', error);
 
     try {
-      if (interaction.deferred || interaction.replied) {
-        await interaction.followUp({ content: 'Произошла ошибка при выполнении команды.', ephemeral: true });
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({ content: 'Произошла ошибка при выполнении команды.' });
       } else {
-        await interaction.reply({ content: 'Произошла ошибка при выполнении команды.', ephemeral: true });
+        await interaction.reply({ content: 'Произошла ошибка при выполнении команды.' });
       }
     } catch (replyError) {
-      console.error('⚠️ Ошибка при отправке follow-up ответа:', replyError);
+      console.error('⚠️ Ошибка при отправке follow-up:', replyError);
     }
   }
 });
-
 
 client.login(process.env.BOT_TOKEN);
