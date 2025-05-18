@@ -57,8 +57,6 @@ async function getRandomCharacter(userId) {
   return normalizedCharacters[0];
 }
 
-// ===================== SLASH COMMAND HANDLERS =======================
-
 async function handleCasino(interaction) {
   const userId = interaction.user.id;
 
@@ -68,7 +66,7 @@ async function handleCasino(interaction) {
     });
 
     if (user.coins < PRICE) {
-      return interaction.reply(`У вас ${user.coins} монет. Для крутки необходимо: ${PRICE}`);
+      return await interaction.followUp(`У вас ${user.coins} монет. Для крутки необходимо: ${PRICE}`);
     }
 
     const character = await getRandomCharacter(userId);
@@ -86,7 +84,7 @@ async function handleCasino(interaction) {
       .setDescription(`Редкость: **${character.rarity}**`)
       .setImage(character.preview);
 
-    await interaction.reply({
+    await interaction.followUp({
       content: `🎉 Поздравляем! Вы получили персонажа!`,
       embeds: [embed],
     });
@@ -102,18 +100,14 @@ async function handleCasino(interaction) {
 
   } catch (err) {
     console.error('❌ Ошибка в казино:', err);
-    if (interaction.replied || interaction.deferred) {
-      await interaction.followUp('Произошла ошибка при выполнении команды.');
-    } else {
-      await interaction.reply('Произошла ошибка при выполнении команды.');
-    }
+    await interaction.followUp('Произошла ошибка при выполнении команды.');
   }
 }
 
 async function handleCollection(interaction) {
   try {
     const rows = await getUserCollection(interaction.user.id);
-    if (rows.length === 0) return interaction.editReply('Коллекция пуста.');
+    if (rows.length === 0) return await interaction.followUp('Коллекция пуста.');
 
     for (const row of rows) {
       const char = characters.find(c => c.name === row.character);
@@ -125,18 +119,14 @@ async function handleCollection(interaction) {
         .setDescription(`Редкость: **${row.rarity}**`)
         .setImage(char.preview);
 
-      await interaction.channel.send({ embeds: [embed] });
+      await interaction.followUp({ embeds: [embed] });
     }
 
-    await interaction.editReply('📦 Ваша коллекция:');
+    await interaction.followUp('📦 Ваша коллекция:');
 
   } catch (err) {
     console.error('❌ Ошибка получения коллекции:', err);
-    if (interaction.deferred || interaction.replied) {
-      await interaction.followUp('Ошибка при получении коллекции.');
-    } else {
-      await interaction.reply('Ошибка при получении коллекции.');
-    }
+    await interaction.followUp('Ошибка при получении коллекции.');
   }
 }
 
@@ -146,7 +136,7 @@ async function handleCoin(interaction) {
   const recipient = interaction.options.getUser('user');
   const recipientId = recipient.id;
 
-  if (amount <= 0) return interaction.reply('Сумма должна быть положительным числом.');
+  if (amount <= 0) return await interaction.followUp('Сумма должна быть положительным числом.');
 
   try {
     const sender = await new Promise((resolve, reject) => {
@@ -154,7 +144,7 @@ async function handleCoin(interaction) {
     });
 
     if (sender.coins < amount) {
-      return interaction.reply('У вас недостаточно монет.');
+      return await interaction.followUp('У вас недостаточно монет.');
     }
 
     await new Promise((resolve, reject) => {
@@ -165,11 +155,11 @@ async function handleCoin(interaction) {
       updateCoins(recipientId, amount, err => err ? reject(err) : resolve());
     });
 
-    interaction.reply(`${amount} монет переведены пользователю ${recipient.username}.`);
+    await interaction.followUp(`${amount} монет переведены пользователю ${recipient.username}.`);
 
   } catch (err) {
     console.error('❌ Ошибка перевода монет:', err);
-    interaction.reply('Произошла ошибка при переводе монет.');
+    await interaction.followUp('Произошла ошибка при переводе монет.');
   }
 }
 
@@ -179,10 +169,10 @@ async function handleBalance(interaction) {
       getUser(interaction.user.id, (err, data) => err ? reject(err) : resolve(data));
     });
 
-    interaction.reply(`💰 У вас ${user.coins} монет.`);
+    await interaction.followUp(`💰 У вас ${user.coins} монет.`);
   } catch (err) {
     console.error('❌ Ошибка получения баланса:', err);
-    interaction.reply('Ошибка при получении баланса.');
+    await interaction.followUp('Ошибка при получении баланса.');
   }
 }
 
@@ -192,7 +182,7 @@ async function handlePrize(interaction) {
   const guildOwnerId = interaction.guild.ownerId;
 
   if (interaction.user.id !== guildOwnerId) {
-    return interaction.reply('❌ Только владелец сервера может использовать эту команду.');
+    return await interaction.followUp('❌ Только владелец сервера может использовать эту команду.');
   }
 
   try {
@@ -200,15 +190,14 @@ async function handlePrize(interaction) {
       updateCoins(recipient.id, amount, err => err ? reject(err) : resolve());
     });
 
-    interaction.reply(`✅ Начислено ${amount} монет пользователю ${recipient.username}.`);
+    await interaction.followUp(`✅ Начислено ${amount} монет пользователю ${recipient.username}.`);
 
   } catch (err) {
     console.error('❌ Ошибка выдачи приза:', err);
-    interaction.reply('Ошибка при выдаче монет.');
+    await interaction.followUp('Ошибка при выдаче монет.');
   }
 }
 
-// ✅ Обновлённая функция начисления монет всем участникам во всех голосовых каналах
 function startVoiceCoinsTask(client, guildId) {
   setInterval(async () => {
     try {
@@ -244,7 +233,7 @@ function startVoiceCoinsTask(client, guildId) {
     } catch (error) {
       console.error('Ошибка в startVoiceCoinsTask:', error);
     }
-  }, 60 * 1000); // Каждую минуту
+  }, 60 * 1000);
 }
 
 module.exports = {
