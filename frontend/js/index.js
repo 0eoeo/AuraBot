@@ -20,7 +20,7 @@ client.once('ready', () => {
   console.log(`🔊 Logged in как ${client.user.tag}`);
 
   // Запускаем таймер начисления монет для голосового канала
-  startVoiceCoinsTask(client, GUILD_ID, VOICE_CHANNEL_ID);
+  startVoiceCoinsTask(client, GUILD_ID);
 });
 
 client.on('messageCreate', async (message) => {
