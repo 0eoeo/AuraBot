@@ -38,7 +38,7 @@ async function playMusicInVoiceChannel(url, interaction) {
     });
 
     // Запуск yt-dlp с передачей cookies
-    const ytdlp = spawn('yt-dlp', ['-f', 'bestaudio', '--cookies', 'cookies.txt', '-o', '-', url]);
+    const ytdlp = spawn('yt-dlp', ['-f', 'bestaudio', '--cookies', '/frontend/js/cookies.txt', '-o', '-', url]);
     ytdlp.stderr.on('data', data => {
       console.error(`yt-dlp error: ${data.toString()}`);
     });
