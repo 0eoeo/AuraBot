@@ -7,6 +7,7 @@ const {
 } = require('@discordjs/voice');
 const { spawn } = require('child_process');
 const ffmpeg = require('ffmpeg-static');
+const path = require('path');
 
 async function playMusicInVoiceChannel(url, interaction) {
   try {
@@ -20,7 +21,6 @@ async function playMusicInVoiceChannel(url, interaction) {
       return;
     }
 
-    // Если интеракция ещё не обработана — откладываем ответ сразу
     if (!interaction.deferred && !interaction.replied) {
       await interaction.deferReply();
     }
@@ -31,12 +31,23 @@ async function playMusicInVoiceChannel(url, interaction) {
       adapterCreator: interaction.guild.voiceAdapterCreator
     });
 
-    // yt-dlp без куки, если нужен доступ — надо прокинуть куки корректно
-    const ytdlp = spawn('yt-dlp', ['-f', 'bestaudio', '-o', '-', url]);
+    // Обработка ошибок соединения
+    connection.on('error', error => {
+      console.error('Ошибка соединения с голосовым каналом:', error);
+      if (connection.state.status !== 'destroyed') connection.destroy();
+    });
+
+    // Запуск yt-dlp с передачей cookies
+    const ytdlp = spawn('yt-dlp', ['-f', 'bestaudio', '--cookies', 'cookies.txt', '-o', '-', url]);
     ytdlp.stderr.on('data', data => {
       console.error(`yt-dlp error: ${data.toString()}`);
     });
 
+    ytdlp.on('close', code => {
+      if (code !== 0) console.error(`yt-dlp exited with code ${code}`);
+    });
+
+    // Запуск ffmpeg для конвертации в PCM формат
     const ffmpegProcess = spawn(ffmpeg, [
       '-i', 'pipe:0',
       '-f', 's16le',
@@ -48,10 +59,17 @@ async function playMusicInVoiceChannel(url, interaction) {
       console.error(`ffmpeg error: ${data.toString()}`);
     });
 
+    ffmpegProcess.on('close', code => {
+      if (code !== 0) console.error(`ffmpeg exited with code ${code}`);
+    });
+
+    // Прокачиваем аудио поток
     ytdlp.stdout.pipe(ffmpegProcess.stdin);
 
+    // Создаем аудио ресурс для Discord
     const resource = createAudioResource(ffmpegProcess.stdout, { inputType: StreamType.Raw });
     const player = createAudioPlayer();
+
     connection.subscribe(player);
     player.play(resource);
 
@@ -65,11 +83,10 @@ async function playMusicInVoiceChannel(url, interaction) {
     });
 
     player.on('error', error => {
-      console.error('Ошибка проигрывания:', error.message);
+      console.error('Ошибка проигрывания:', error.message, error.stack);
       if (connection.state.status !== 'destroyed') connection.destroy();
     });
 
-    // После deferReply редактируем ответ, чтобы показать, что всё запустилось
     if (interaction.deferred && !interaction.replied) {
       await interaction.editReply('🎶 Воспроизвожу музыку!');
     }
@@ -77,7 +94,6 @@ async function playMusicInVoiceChannel(url, interaction) {
   } catch (error) {
     console.error('Ошибка в playMusicInVoiceChannel:', error);
 
-    // Попытка отправить сообщение об ошибке только если ещё не было ответа
     try {
       if (!interaction.replied && !interaction.deferred) {
         await interaction.reply({ content: 'Произошла ошибка при воспроизведении музыки.', ephemeral: true });
