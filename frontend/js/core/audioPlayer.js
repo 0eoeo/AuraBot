@@ -8,14 +8,16 @@ const {
 const { spawn } = require('child_process');
 const ffmpeg = require('ffmpeg-static');
 
-async function playMusicInVoiceChannel(url, message) {
-  const voiceChannel = message.member.voice.channel;
-  if (!voiceChannel) return message.reply('🔇 Ты должен быть в голосовом канале!');
+async function playMusicInVoiceChannel(url, interaction) {
+  const voiceChannel = interaction.member.voice.channel;
+  if (!voiceChannel) return interaction.reply('🔇 Ты должен быть в голосовом канале!');
+
+  await interaction.deferReply();
 
   const connection = joinVoiceChannel({
     channelId: voiceChannel.id,
-    guildId: message.guild.id,
-    adapterCreator: message.guild.voiceAdapterCreator
+    guildId: interaction.guild.id,
+    adapterCreator: interaction.guild.voiceAdapterCreator
   });
 
   const ytdlp = spawn('yt-dlp', ['-f', 'bestaudio', '-o', '-', url]);
@@ -33,7 +35,6 @@ async function playMusicInVoiceChannel(url, message) {
 
   player.on(AudioPlayerStatus.Playing, () => {
     console.log('▶️ Музыка проигрывается');
-    message.reply('🎶 Воспроизвожу музыку!');
   });
 
   player.on(AudioPlayerStatus.Idle, () => {
@@ -45,6 +46,8 @@ async function playMusicInVoiceChannel(url, message) {
     console.error('🎧 Ошибка проигрывания:', error.message);
     if (connection.state.status !== 'destroyed') connection.destroy();
   });
+
+  await interaction.editReply('🎶 Воспроизвожу музыку!');
 }
 
 function skipSong(message) {
