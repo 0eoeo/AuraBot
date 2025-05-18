@@ -2,10 +2,23 @@ const { Client, GatewayIntentBits } = require('discord.js');
 const { handleInteraction } = require('./core/messageHandler');
 const { handleTextMessage } = require('./core/textHandler');
 const { getGuildState } = require('./core/voiceManager');
-const { startVoiceCoinsTask } = require('./core/characterHandler'); // корректный путь
+const { startVoiceCoinsTask } = require('./core/characterHandler');
+const express = require('express');
 require('dotenv').config({ path: '../.env' });
 
-const GUILD_ID = process.env.GUILD_ID; // замените на реальный ID сервера
+const GUILD_ID = process.env.GUILD_ID;
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const PORT = process.env.PORT || 3000;
+
+const app = express();
+
+app.get('/', (req, res) => {
+  res.send('Bot is running');
+});
+
+app.listen(PORT, () => {
+  console.log(`🌐 HTTP server listening on port ${PORT}`);
+});
 
 const client = new Client({
   intents: [
@@ -18,8 +31,6 @@ const client = new Client({
 
 client.once('ready', () => {
   console.log(`🔊 Logged in как ${client.user.tag}`);
-
-  // Запускаем таймер начисления монет для голосового канала
   startVoiceCoinsTask(client, GUILD_ID);
 });
 
@@ -45,7 +56,7 @@ client.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
   try {
-    await interaction.deferReply({ ephemeral: true }); // безопасно "замораживает" интеракцию
+    await interaction.deferReply({ ephemeral: true });
     await handleInteraction(interaction);
   } catch (error) {
     console.error('❌ Ошибка обработки команды:', error);
@@ -62,4 +73,4 @@ client.on('interactionCreate', async (interaction) => {
   }
 });
 
-client.login(process.env.BOT_TOKEN);
+client.login(BOT_TOKEN);
