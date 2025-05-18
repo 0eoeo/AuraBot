@@ -112,8 +112,6 @@ async function handleCasino(interaction) {
 
 async function handleCollection(interaction) {
   try {
-    await interaction.deferReply(); // добавить это в начало
-
     const rows = await getUserCollection(interaction.user.id);
     if (rows.length === 0) return interaction.editReply('Коллекция пуста.');
 
