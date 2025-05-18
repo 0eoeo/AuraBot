@@ -115,11 +115,11 @@ async function handleCasino(interaction) {
 
     if (!alreadyOwned) {
       await new Promise((resolve, reject) => {
-      addCharacter(userId, character.name, character.rarity, character.preview, (err) => {
-        if (err) return reject('Ошибка добавления персонажа.');
-        resolve();
+        addCharacter(userId, character.name, character.rarity, character.preview, (err) => {
+          if (err) return reject('Ошибка добавления персонажа.');
+          resolve();
+        });
       });
-    });
     }
 
   } catch (err) {
@@ -227,10 +227,46 @@ async function handlePrize(interaction) {
   }
 }
 
+// Функция запуска таймера — начисляет монеты пользователям, находящимся в голосовом канале
+function startVoiceCoinsTask(client, guildId, voiceChannelId) {
+  setInterval(async () => {
+    try {
+      const guild = await client.guilds.fetch(guildId);
+      if (!guild) return;
+
+      const voiceChannel = guild.channels.cache.get(voiceChannelId);
+      if (!voiceChannel || !voiceChannel.isVoiceBased()) {
+        console.warn('Голосовой канал не найден или неверного типа');
+        return;
+      }
+
+      const members = voiceChannel.members;
+
+      for (const [memberId] of members) {
+        await new Promise((resolve, reject) => {
+          updateCoins(memberId, 1, err => {
+            if (err) {
+              console.error(`Ошибка начисления монет пользователю ${memberId}:`, err);
+              return reject(err);
+            }
+            resolve();
+          });
+        });
+      }
+
+      console.log(`Начислено 1 монету ${members.size} пользователям в голосовом канале ${voiceChannel.name}`);
+
+    } catch (error) {
+      console.error('Ошибка в startVoiceCoinsTask:', error);
+    }
+  }, 60 * 1000); // Каждую минуту
+}
+
 module.exports = {
   handleCasino,
   handleCollection,
   handleCoin,
   handleBalance,
-  handlePrize
+  handlePrize,
+  startVoiceCoinsTask,
 };

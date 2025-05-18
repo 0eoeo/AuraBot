@@ -2,19 +2,26 @@ const { Client, GatewayIntentBits } = require('discord.js');
 const { handleInteraction } = require('./core/messageHandler');
 const { handleTextMessage } = require('./core/textHandler');
 const { getGuildState } = require('./core/voiceManager');
-require('dotenv').config({path: '../.env'});
+const { startVoiceCoinsTask } = require('./core/characterHandler'); // корректный путь
+require('dotenv').config({ path: '../.env' });
+
+const GUILD_ID = process.env.GUILD_ID; // замените на реальный ID сервера
+const VOICE_CHANNEL_ID = 'ВАШ_ID_ГОЛОСОВОГО_КАНАЛА'; // замените на реальный ID голосового канала
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
-  ]
+    GatewayIntentBits.MessageContent,
+  ],
 });
 
 client.once('ready', () => {
-  console.log(`🔊 Logged in as ${client.user.tag}`);
+  console.log(`🔊 Logged in как ${client.user.tag}`);
+
+  // Запускаем таймер начисления монет для голосового канала
+  startVoiceCoinsTask(client, GUILD_ID, VOICE_CHANNEL_ID);
 });
 
 client.on('messageCreate', async (message) => {
@@ -37,23 +44,18 @@ client.on('messageCreate', async (message) => {
 
 client.on('interactionCreate', async (interaction) => {
   try {
-    if (!interaction.isCommand()) return;
-
-    console.log(`🛠 Interaction command received: ${interaction.commandName}`);
-    await handleInteraction(interaction);
-
-  } catch (error) {
-    console.error('❌ Error in interaction handler:', error);
-    try {
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({ content: 'Произошла ошибка при обработке команды.', ephemeral: true });
+     if (interaction.isChatInputCommand()) {
+        await handleInteraction(interaction);
+       }
+     }
+  catch (error) {
+    console.error('❌ Ошибка обработки команды:', error);
+    if (interaction.replied || interaction.deferred) {
+        await interaction.followUp('Произошла ошибка при выполнении команды.');
       } else {
-        await interaction.reply({ content: 'Произошла ошибка при обработке команды.', ephemeral: true });
+        await interaction.reply('Произошла ошибка при выполнении команды.');
       }
-    } catch (replyError) {
-      console.error('❌ Failed to send error reply:', replyError);
-    }
   }
 });
 
-client.login(process.env.BOT_TOKEN);
+client.login(process.env.DISCORD_BOT_TOKEN);
