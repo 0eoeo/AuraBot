@@ -21,8 +21,8 @@ const commands = [
     option.setName('url').setDescription('URL для воспроизведения').setRequired(true)
   ),
   new SlashCommandBuilder().setName('stop').setDescription('Остановить музыку'),
-  new SlashCommandBuilder().setName('join').setDescription('Добавить Инлинь в голосовой канал'),
-  new SlashCommandBuilder().setName('leave').setDescription('Выгнать Инлинь из голосового канала'),
+  new SlashCommandBuilder().setName('join').setDescription('Добавить в голосовой канал'),
+  new SlashCommandBuilder().setName('leave').setDescription('Выгнать из голосового канала'),
   new SlashCommandBuilder().setName('casino').setDescription('Крутка!'),
   new SlashCommandBuilder()
     .setName('coin')

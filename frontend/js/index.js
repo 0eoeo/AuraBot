@@ -6,7 +6,6 @@ const { startVoiceCoinsTask } = require('./core/characterHandler'); // корр�
 require('dotenv').config({ path: '../.env' });
 
 const GUILD_ID = process.env.GUILD_ID; // замените на реальный ID сервера
-const VOICE_CHANNEL_ID = 'ВАШ_ID_ГОЛОСОВОГО_КАНАЛА'; // замените на реальный ID голосового канала
 
 const client = new Client({
   intents: [
@@ -27,7 +26,7 @@ client.once('ready', () => {
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
-  if (message.channel.name === 'инлинь') {
+  if (message.channel.name === 'бот') {
     const state = getGuildState(message.guild.id);
     const { playbackQueue = [], isPlaying = false, playNext = () => {} } = state || {};
 
@@ -58,4 +57,4 @@ client.on('interactionCreate', async (interaction) => {
   }
 });
 
-client.login(process.env.DISCORD_BOT_TOKEN);
+client.login(process.env.BOT_TOKEN);
