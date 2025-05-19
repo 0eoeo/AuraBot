@@ -77,14 +77,15 @@ async function playMusicInVoiceChannel(url, interaction) {
 
           // Выбираем аудиоформаты без видео или с vcodec none, сортируем по bitrate
           const audioFormats = json.formats
-            .filter(f => f.acodec !== 'none' && (!f.vcodec || f.vcodec === 'none'))
-            .sort((a, b) => (b.abr || 0) - (a.abr || 0));
+          .filter(f => f.acodec !== 'none')
+          .sort((a, b) => ( (b.abr || 128) - (a.abr || 128) ));
 
           if (!audioFormats.length) {
             return reject(new Error('❌ Не найдено аудиоформатов'));
           }
 
           resolve(audioFormats[0].format_id);
+
         } catch (e) {
           console.error('❌ yt-dlp не смог вернуть JSON:', stdout);
           console.error('❌ Ошибка парсинга форматов:', e);
