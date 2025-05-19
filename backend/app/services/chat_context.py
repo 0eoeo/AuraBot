@@ -5,13 +5,14 @@ import requests
 import shutil
 from langchain.schema import HumanMessage, SystemMessage
 from langchain_community.chat_models.gigachat import GigaChat
+from gigachat import GigaChat as gc
 from backend.app.config import GIGACHAT_TOKEN, OBSCENE_PATTERNS, OBSCENE_REPLACEMENTS
 
 
 class ChatContextManager:
     def __init__(self):
         self.chat = GigaChat(credentials=GIGACHAT_TOKEN, verify_ssl_certs=False)
-        self.giga = GigaChat(
+        self.giga = gc(
             credentials=GIGACHAT_TOKEN, verify_ssl_certs=False
         ).get_token()
         self.token = self.giga.access_token
