@@ -4,13 +4,14 @@ from pprint import pprint
 import requests
 import shutil
 from langchain.schema import HumanMessage, SystemMessage
-from gigachat import GigaChat
+from langchain_community.chat_models.gigachat import GigaChat
 from backend.app.config import GIGACHAT_TOKEN, OBSCENE_PATTERNS, OBSCENE_REPLACEMENTS
+
 
 class ChatContextManager:
     def __init__(self):
         self.chat = GigaChat(credentials=GIGACHAT_TOKEN, verify_ssl_certs=False)
-        self.token = self.chat.token
+        self.token = self.chat._client.token
         self.messages = [
             SystemMessage(
                 content=(
