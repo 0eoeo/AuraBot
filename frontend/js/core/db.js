@@ -42,16 +42,19 @@ function getUser(userId, callback) {
 }
 
 function updateCoins(userId, amount, callback) {
-  db.run('UPDATE users SET coins = coins + ? WHERE id = ?', [amount, userId], function (err) {
-    if (err) {
-      console.error('Ошибка при обновлении монет:', err);
-      return callback(err);
-    }
-    console.log(`Монеты обновлены для пользователя ${userId}. Новое количество монет: ${amount}`);
-    callback(null);
+  getUser(userId, (err, user) => {
+    if (err) return callback(err); // Ошибка при получении или создании пользователя
+
+    db.run('UPDATE users SET coins = coins + ? WHERE id = ?', [amount, userId], function (err) {
+      if (err) {
+        console.error('Ошибка при обновлении монет:', err);
+        return callback(err);
+      }
+      console.log(`Монеты обновлены для пользователя ${userId}. Изменение: ${amount}`);
+      callback(null);
+    });
   });
 }
-
 
 function addCharacter(userId, character, rarity, preview, callback) {
   db.run(`INSERT INTO collection (user_id, character, rarity, preview) VALUES (?, ?, ?, ?)`, [userId, character, rarity, preview], callback);

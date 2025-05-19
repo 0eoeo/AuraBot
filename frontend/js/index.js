@@ -56,22 +56,22 @@ client.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
   try {
-    await interaction.deferReply({ ephemeral: true });
-    await handleInteraction(interaction);
-  } catch (error) {
-    console.error('❌ Ошибка при выполнении команды:', error);
+  await interaction.deferReply({ flags: 64 });
+  await handleInteraction(interaction);
+    } catch (error) {
+      console.error('❌ Ошибка при выполнении команды:', error);
 
-    try {
-      const errorMsg = { content: 'Произошла ошибка при выполнении команды.' };
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp(errorMsg);
-      } else {
-        await interaction.reply(errorMsg);
+      try {
+        const errorMsg = { content: 'Произошла ошибка при выполнении команды.', flags: 64 };
+        if (interaction.replied || interaction.deferred) {
+          await interaction.followUp(errorMsg);
+        } else {
+          await interaction.reply(errorMsg);
+        }
+      } catch (followUpError) {
+        console.error('⚠️ Ошибка при отправке follow-up:', followUpError);
       }
-    } catch (followUpError) {
-      console.error('⚠️ Ошибка при отправке follow-up:', followUpError);
     }
-  }
 });
 
 client.login(BOT_TOKEN);

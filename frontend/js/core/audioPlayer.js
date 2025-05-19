@@ -15,7 +15,7 @@ async function playMusicInVoiceChannel(url, interaction) {
     if (!voiceChannel) {
       const msg = '🔇 Ты должен быть в голосовом канале!';
       if (!interaction.replied && !interaction.deferred) {
-        await interaction.reply({ content: msg, ephemeral: true });
+        await interaction.reply({ content: msg, flags: 64 });
       } else {
         await interaction.editReply(msg);
       }
@@ -76,8 +76,13 @@ async function playMusicInVoiceChannel(url, interaction) {
           })));
 
           // Выбираем аудиоформаты без видео или с vcodec none, сортируем по bitrate
-          const audioFormats = json.formats
-          .filter(f => f.acodec !== 'none' && (f.vcodec === 'none' || f.format_id === '18'))
+         const audioFormats = json.formats
+          .filter(f =>
+            f.acodec !== 'none' &&
+            (f.vcodec === 'none' || f.vcodec === null) &&
+            f.ext !== 'mhtml' &&  // Убираем SABR-форматы
+            f.url                 // Некоторые могут быть без ссылки
+          )
           .sort((a, b) => ( (b.abr || 128) - (a.abr || 128) ));
 
 
@@ -95,10 +100,18 @@ async function playMusicInVoiceChannel(url, interaction) {
       });
     });
 
-    // Запускаем yt-dlp с выбранным форматом
-    const ytdlpArgs = ['-f', formatId, '-o', '-', url];
+    const ytdlpArgs = [
+      '-f', formatId,
+      '-o', '-',
+      '--no-check-certificate',
+      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+      '--referer', 'https://www.youtube.com',
+      '--add-header', 'Accept-Language: en-US,en;q=0.9',
+      url
+    ];
+
     if (cookiesExists) {
-      ytdlpArgs.splice(2, 0, '--cookies', 'cookies.txt');  // вставка перед URL
+      ytdlpArgs.splice(2, 0, '--cookies', 'cookies.txt');
     }
     const ytdlp = spawn('yt-dlp', ytdlpArgs);
 
@@ -174,7 +187,7 @@ async function playMusicInVoiceChannel(url, interaction) {
     const msg = '❌ Не удалось воспроизвести музыку. Убедись, что ссылка корректна и видео доступно.';
     try {
       if (!interaction.replied && !interaction.deferred) {
-        await interaction.reply({ content: msg, ephemeral: true });
+        await interaction.reply({ content: msg, flags: 64 });
       } else {
         await interaction.editReply(msg);
       }

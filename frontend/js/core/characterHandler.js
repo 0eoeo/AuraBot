@@ -3,10 +3,17 @@ const { EmbedBuilder } = require('discord.js');
 const PRICE = 100;
 
 const characters = [
-  { name: 'Сопля', rarity: 'Common', chance: 0.9, preview: 'https://i.pinimg.com/originals/ff/98/6c/ff986c4116c1551007ff0152e2a4d85e.gif' },
-  { name: 'Птичка', rarity: 'Rare', chance: 0.07, preview: 'https://i.pinimg.com/originals/af/e2/52/afe2524e0c5047a7024ff3e35cc2b09d.gif' },
-  { name: 'Лисичка', rarity: 'Epic', chance: 0.02, preview: 'https://i.pinimg.com/originals/de/4e/57/de4e57e4e2cdf53dba84a026fe61086e.gif' },
-  { name: 'Кошька', rarity: 'Legendary', chance: 0.01, preview: 'https://i.pinimg.com/originals/a6/c2/f0/a6c2f03d5f21dbd24166ba8211366f74.gif' },
+  { name: 'Сопля', rarity: 'Common', chance: 0.9, preview: 'https://i.imgur.com/3XEe50q.gif' },
+  { name: 'Маньячка', rarity: 'Common', chance: 0.9, preview: 'https://i.imgur.com/AXoRfjz.gif' },
+
+  { name: 'Птичка', rarity: 'Rare', chance: 0.07, preview: 'https://i.imgur.com/SeSnict.gif' },
+  { name: 'Злюка', rarity: 'Rare', chance: 0.07, preview: 'https://i.imgur.com/Ebfsf7D.gif' },
+
+  { name: 'Лисичка', rarity: 'Epic', chance: 0.02, preview: 'https://i.imgur.com/nzT34YH.gif' },
+  { name: 'Сиськиии', rarity: 'Epic', chance: 0.02, preview: 'https://i.imgur.com/MOtmPAF.gif' },
+
+  { name: 'КОШЬКА', rarity: 'Legendary', chance: 0.01, preview: 'https://i.imgur.com/9JK8SeC.gif' },
+  { name: 'ДВЕ ТЯНОЧКИ', rarity: 'Legendary', chance: 0.01, preview: 'https://i.imgur.com/HuFN1Jn.gif' },
 ];
 
 function getRarityColor(rarity) {
@@ -227,7 +234,7 @@ function startVoiceCoinsTask(client, guildId) {
       }
 
       if (total > 0) {
-        console.log(`✅ Начислено 1 монету каждому из ${total} участников голосовых каналов.`);
+        console.log(`✅ Начислена 1 монета каждому из ${total} участников голосовых каналов.`);
       }
 
     } catch (error) {
