@@ -12,10 +12,6 @@ from backend.app.config import GIGACHAT_TOKEN, OBSCENE_PATTERNS, OBSCENE_REPLACE
 class ChatContextManager:
     def __init__(self):
         self.chat = GigaChat(credentials=GIGACHAT_TOKEN, verify_ssl_certs=False)
-        self.giga = gc(
-            credentials=GIGACHAT_TOKEN, verify_ssl_certs=False
-        ).get_token()
-        self.token = self.giga.access_token
         self.messages = [
             SystemMessage(
                 content=(
@@ -38,10 +34,15 @@ class ChatContextManager:
         return matched_words
 
     def generate_image(self, prompt: str) -> str:
+        giga = gc(
+            credentials=GIGACHAT_TOKEN, verify_ssl_certs=False
+        ).get_token()
+        token = giga.access_token
+
         headers = {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'Authorization': f'Bearer {self.token}',
+            'Authorization': f'Bearer {token}',
         }
 
         json_data = {
@@ -69,7 +70,7 @@ class ChatContextManager:
 
             img_response = requests.get(img_url, headers={
                 'Accept': 'application/jpg',
-                'Authorization': f'Bearer {self.token}'
+                'Authorization': f'Bearer {token}'
             }, stream=True, verify=False)
 
             file_path = f"{file_id}.jpg"
