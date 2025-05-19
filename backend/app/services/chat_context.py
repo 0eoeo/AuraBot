@@ -1,4 +1,6 @@
 import re
+from pprint import pprint
+
 import requests
 import shutil
 from langchain.schema import HumanMessage, SystemMessage
@@ -38,7 +40,6 @@ class ChatContextManager:
         }
 
         json_data = {
-            'model': 'GigaChat-Pro-preview',
             'messages': [{'role': 'user', 'content': prompt}],
             'function_call': 'auto',
         }
@@ -49,6 +50,7 @@ class ChatContextManager:
             json=json_data,
             verify=False
         )
+        pprint(response.json())
 
         if response.status_code == 200:
             data = response.json()
