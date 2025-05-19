@@ -29,6 +29,7 @@ async def reply(text_req: TextRequest):
     if result["type"] == "image":
         with open(result["content"], "rb") as f:
             encoded_image = base64.b64encode(f.read()).decode("utf-8")
+        os.remove(result["content"])
         return {
             "type": "image",
             "image_base64": encoded_image,
