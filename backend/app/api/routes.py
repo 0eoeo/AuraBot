@@ -10,10 +10,8 @@ from ..services.whisper_service import AzureSpeechService
 from ..utils.speaker_utils import decode_speaker_name
 from ..config import *
 
-
 router = APIRouter()
 
-# Инициализация компонентов
 voice_generator = VoiceGenerator()
 chat_context = ChatContextManager()
 recognize_service = AzureSpeechService(subscription_key=TTS_KEY, region=REGION)
@@ -23,8 +21,24 @@ recognize_service = AzureSpeechService(subscription_key=TTS_KEY, region=REGION)
 async def reply(text_req: TextRequest):
     speaker = text_req.speaker.strip() or "Бро"
     text = text_req.text.strip().lower()
-    response_text = await chat_context.get_response(f'[{speaker}]: {text}')
-    return {"text": response_text or ""}
+    result = await chat_context.get_response(f'[{speaker}]: {text}')
+
+    if not result:
+        return {"text": ""}
+
+    if result["type"] == "image":
+        with open(result["content"], "rb") as f:
+            encoded_image = base64.b64encode(f.read()).decode("utf-8")
+        return {
+            "type": "image",
+            "image_base64": encoded_image,
+            "filename": result["content"]
+        }
+
+    return {
+        "type": "text",
+        "text": result["content"]
+    }
 
 
 @router.post("/voice")
@@ -59,13 +73,18 @@ async def recognize(request: Request, audio_data: AudioRequest):
         return StreamingResponse(iter([b""]), media_type="audio/wav")
 
     if any(phrase in text for phrase in ALLOWED_PHRASES):
-        response_text = await chat_context.get_response(f'[{speaker}]: {text}')
+        response = await chat_context.get_response(f'[{speaker}]: {text}')
+        if not response:
+            return StreamingResponse(iter([b""]), media_type="audio/wav")
 
-        if response_text:
-            return StreamingResponse(
-                voice_generator.stream_voice(response_text),
-                media_type="audio/wav",
-                headers={"X-Content-Type-Options": "nosniff"}
-            )
+        if response["type"] == "image":
+            print("🖼 Генерация изображения, озвучка не требуется.")
+            return StreamingResponse(iter([b""]), media_type="audio/wav")
 
-        return StreamingResponse(iter([b""]), media_type="audio/wav")
+        return StreamingResponse(
+            voice_generator.stream_voice(response["content"]),
+            media_type="audio/wav",
+            headers={"X-Content-Type-Options": "nosniff"}
+        )
+
+    return StreamingResponse(iter([b""]), media_type="audio/wav")

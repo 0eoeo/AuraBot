@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { AttachmentBuilder } = require('discord.js');
 
 async function handleTextMessage(message, playbackQueue, isPlaying, playNext) {
   const speaker = Buffer.from(message.member.displayName, 'utf-8').toString('base64');
@@ -10,8 +11,25 @@ async function handleTextMessage(message, playbackQueue, isPlaying, playNext) {
       text
     });
 
-    const replyText = replyResponse.data?.text?.trim();
-    if (!replyText) return await message.reply('🤖 Бот не ответил.');
+    const { type, text: replyText, image_base64, filename } = replyResponse.data;
+
+    if (type === 'image') {
+      if (!image_base64 || !filename) {
+        await message.reply('⚠️ Картинка не получена.');
+        return;
+      }
+
+      const imageBuffer = Buffer.from(image_base64, 'base64');
+      const attachment = new AttachmentBuilder(imageBuffer, { name: filename || 'image.jpg' });
+
+      await message.reply({ content: '🖼 Вот что получилось:', files: [attachment] });
+      return;
+    }
+
+    if (!replyText?.trim()) {
+      await message.reply('🤖 Бот не ответил.');
+      return;
+    }
 
     await message.reply(replyText);
 
