@@ -11,7 +11,10 @@ from backend.app.config import GIGACHAT_TOKEN, OBSCENE_PATTERNS, OBSCENE_REPLACE
 class ChatContextManager:
     def __init__(self):
         self.chat = GigaChat(credentials=GIGACHAT_TOKEN, verify_ssl_certs=False)
-        self.token = self.chat._client.token
+        self.giga = GigaChat(
+            credentials=GIGACHAT_TOKEN, verify_ssl_certs=False
+        ).get_token()
+        self.token = self.giga.access_token
         self.messages = [
             SystemMessage(
                 content=(
