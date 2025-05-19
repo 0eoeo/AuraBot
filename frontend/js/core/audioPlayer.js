@@ -87,14 +87,16 @@ async function playMusicInVoiceChannel(url, interaction) {
     });
 
     const ytdlpArgs = [
-      '-f', formatId,
+      '-f', 'bestaudio',
       '-o', '-',
       '--no-check-certificate',
-      '--user-agent', 'Mozilla/5.0',
+      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
       '--referer', 'https://www.youtube.com',
       '--add-header', 'Accept-Language: en-US,en;q=0.9',
+      '--hls-prefer-native',
       url
     ];
+
     if (cookiesExists) {
       ytdlpArgs.splice(2, 0, '--cookies', 'cookies.txt');
     }
