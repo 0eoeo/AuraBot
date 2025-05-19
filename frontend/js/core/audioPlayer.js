@@ -2,8 +2,10 @@ const {
   joinVoiceChannel,
   createAudioPlayer,
   createAudioResource,
+  entersState,
   AudioPlayerStatus,
-  StreamType
+  StreamType,
+  VoiceConnectionStatus
 } = require('@discordjs/voice');
 const { spawn } = require('child_process');
 const ffmpeg = require('ffmpeg-static');
@@ -15,7 +17,7 @@ async function playMusicInVoiceChannel(url, interaction) {
     if (!voiceChannel) {
       const msg = '🔇 Ты должен быть в голосовом канале!';
       if (!interaction.replied && !interaction.deferred) {
-        await interaction.reply({ content: msg, flags: 64 });
+        await interaction.reply({ content: msg, ephemeral: true });
       } else {
         await interaction.editReply(msg);
       }
@@ -41,20 +43,17 @@ async function playMusicInVoiceChannel(url, interaction) {
       if (connection.state.status !== 'destroyed') connection.destroy();
     });
 
-    // Проверяем наличие cookies.txt
-    const cookiesExists = fs.existsSync('cookies.txt');
-    if (!cookiesExists) {
-      console.warn('⚠️ Файл cookies.txt не найден — продолжаем без него');
-    }
+    // Ожидаем подключения
+    await entersState(connection, VoiceConnectionStatus.Ready, 30_000);
 
-    // Получаем доступные форматы через yt-dlp -J (JSON)
+    const cookiesExists = fs.existsSync('cookies.txt');
+
     const formatId = await new Promise((resolve, reject) => {
       const args = ['-J', url];
       if (cookiesExists) args.splice(1, 0, '--cookies', 'cookies.txt');
       const ytdlpFormats = spawn('yt-dlp', args);
 
-      let stdout = '';
-      let stderr = '';
+      let stdout = '', stderr = '';
 
       ytdlpFormats.stdout.on('data', data => stdout += data.toString());
       ytdlpFormats.stderr.on('data', data => stderr += data.toString());
@@ -67,33 +66,21 @@ async function playMusicInVoiceChannel(url, interaction) {
 
         try {
           const json = JSON.parse(stdout);
-          console.log('📦 Форматы yt-dlp:', json.formats.map(f => ({
-            format_id: f.format_id,
-            ext: f.ext,
-            acodec: f.acodec,
-            vcodec: f.vcodec,
-            abr: f.abr
-          })));
-
-          // Выбираем аудиоформаты без видео или с vcodec none, сортируем по bitrate
-         const audioFormats = json.formats
-          .filter(f =>
-            f.acodec !== 'none' &&
-            (f.vcodec === 'none' || f.vcodec === null) &&
-            f.ext !== 'mhtml' &&
-            f.url
-          )
-          .sort((a, b) => ((b.abr || 0) - (a.abr || 0)));
+          const audioFormats = json.formats
+            .filter(f =>
+              f.acodec !== 'none' &&
+              f.ext !== 'mhtml' &&
+              f.url
+            )
+            .sort((a, b) => ((b.abr || 0) - (a.abr || 0)));
 
           if (!audioFormats.length) {
             return reject(new Error('❌ Не найдено аудиоформатов'));
           }
 
           resolve(audioFormats[0].format_id);
-
         } catch (e) {
-          console.error('❌ yt-dlp не смог вернуть JSON:', stdout);
-          console.error('❌ Ошибка парсинга форматов:', e);
+          console.error('❌ Ошибка парсинга JSON от yt-dlp:', e);
           reject(e);
         }
       });
@@ -103,15 +90,15 @@ async function playMusicInVoiceChannel(url, interaction) {
       '-f', formatId,
       '-o', '-',
       '--no-check-certificate',
-      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+      '--user-agent', 'Mozilla/5.0',
       '--referer', 'https://www.youtube.com',
       '--add-header', 'Accept-Language: en-US,en;q=0.9',
       url
     ];
-
     if (cookiesExists) {
       ytdlpArgs.splice(2, 0, '--cookies', 'cookies.txt');
     }
+
     const ytdlp = spawn('yt-dlp', ytdlpArgs);
 
     ytdlp.stderr.on('data', data => {
@@ -122,7 +109,6 @@ async function playMusicInVoiceChannel(url, interaction) {
       if (code !== 0) console.error(`yt-dlp exited with code ${code}`);
     });
 
-    // Запускаем ffmpeg
     const ffmpegProcess = spawn(ffmpeg, [
       '-i', 'pipe:0',
       '-f', 's16le',
@@ -150,7 +136,6 @@ async function playMusicInVoiceChannel(url, interaction) {
       console.log('▶️ Музыка проигрывается');
     });
 
-    // Очистка процессов и отключение при завершении
     player.on(AudioPlayerStatus.Idle, () => {
       console.log('⏹️ Музыка остановлена');
       ytdlp.kill('SIGKILL');
@@ -159,7 +144,7 @@ async function playMusicInVoiceChannel(url, interaction) {
     });
 
     player.on('error', error => {
-      console.error('Ошибка проигрывания:', error.message, error.stack);
+      console.error('Ошибка проигрывания:', error);
       ytdlp.kill('SIGKILL');
       ffmpegProcess.kill('SIGKILL');
       if (connection.state.status !== 'destroyed') connection.destroy();
@@ -169,24 +154,12 @@ async function playMusicInVoiceChannel(url, interaction) {
       await interaction.editReply('🎶 Воспроизвожу музыку!');
     }
 
-    // Автоотключение после 5 минут простоя (если хотите добавить)
-    /*
-    setTimeout(() => {
-      if (connection.state.status !== 'destroyed') {
-        console.log('⏱️ Таймаут — отключение');
-        ytdlp.kill('SIGKILL');
-        ffmpegProcess.kill('SIGKILL');
-        connection.destroy();
-      }
-    }, 5 * 60 * 1000);
-    */
-
   } catch (error) {
     console.error('❌ Ошибка в playMusicInVoiceChannel:', error);
     const msg = '❌ Не удалось воспроизвести музыку. Убедись, что ссылка корректна и видео доступно.';
     try {
       if (!interaction.replied && !interaction.deferred) {
-        await interaction.reply({ content: msg, flags: 64 });
+        await interaction.reply({ content: msg, ephemeral: true });
       } else {
         await interaction.editReply(msg);
       }
