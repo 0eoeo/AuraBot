@@ -77,8 +77,9 @@ async function playMusicInVoiceChannel(url, interaction) {
 
           // Выбираем аудиоформаты без видео или с vcodec none, сортируем по bitrate
           const audioFormats = json.formats
-          .filter(f => f.acodec !== 'none')
+          .filter(f => f.acodec !== 'none' && (f.vcodec === 'none' || f.format_id === '18'))
           .sort((a, b) => ( (b.abr || 128) - (a.abr || 128) ));
+
 
           if (!audioFormats.length) {
             return reject(new Error('❌ Не найдено аудиоформатов'));
