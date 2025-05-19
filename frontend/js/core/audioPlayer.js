@@ -80,11 +80,10 @@ async function playMusicInVoiceChannel(url, interaction) {
           .filter(f =>
             f.acodec !== 'none' &&
             (f.vcodec === 'none' || f.vcodec === null) &&
-            f.ext !== 'mhtml' &&  // Убираем SABR-форматы
-            f.url                 // Некоторые могут быть без ссылки
+            f.ext !== 'mhtml' &&
+            f.url
           )
-          .sort((a, b) => ( (b.abr || 128) - (a.abr || 128) ));
-
+          .sort((a, b) => ((b.abr || 0) - (a.abr || 0)));
 
           if (!audioFormats.length) {
             return reject(new Error('❌ Не найдено аудиоформатов'));
