@@ -1,5 +1,3 @@
-# Netscape HTTP Cookie File
-# This file is generated from JSON export
 .youtube.com	TRUE	/	TRUE	1782120170	__Secure-1PAPISID	ymzdY_KZbkM-si2J/ARdgBhj3y8_PkEOIn
 .youtube.com	TRUE	/	TRUE	1782120170	__Secure-1PSID	g.a000xAhn1vd5cbrEVASgACfRPbhYEem4FMtPRiUIDvZ_mtPgpQD1kgn996mGN2ucAtx6nuSB-AACgYKAaQSARISFQHGX2MiHpNVRppPiRJbBNUaqibYshoVAUF8yKorvGSTOo3PUkBQyzSR-h3K0076
 .youtube.com	TRUE	/	TRUE	1779096244	__Secure-1PSIDCC	AKEyXzV66mtDffn0VU2xyaERUQqYngvptROuCo91TfWHZe0RAAbvQJPeeVKrPlkTpE8Rcm9M
