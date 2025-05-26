@@ -1,11 +1,10 @@
 const cron = require('node-cron');
-const request = require('request');
 const axios = require('axios');
 const { EmbedBuilder } = require('discord.js');
 
 const ASTRO_API_KEY = process.env.ASTRO_API_KEY;
 
-// Получаем положение планет с помощью request и промиса
+// Получаем положение планет с помощью axios и промиса
 async function getPlanetsData() {
   const now = new Date();
   const body = {
@@ -40,10 +39,17 @@ async function getPlanetsData() {
     }
 
     const planets = data.output.map(item => {
-      const planetRu = item.planet.ru;
-      const signRu = item.zodiac_sign.name.ru;
-      const normDeg = item.normDegree;
-      const isRetro = item.isRetro.toLowerCase() === 'true';
+      const planetRu = item.planet?.ru || 'Неизвестно';
+      const signRu = item.zodiac_sign?.name?.ru || 'Неизвестно';
+      const normDeg = item.normDegree || 0;
+
+      // Обрабатываем isRetro, может быть строкой или булевым значением
+      let isRetro = false;
+      if (typeof item.isRetro === 'string') {
+        isRetro = item.isRetro.toLowerCase() === 'true';
+      } else if (typeof item.isRetro === 'boolean') {
+        isRetro = item.isRetro;
+      }
 
       return {
         name: planetRu,
@@ -55,7 +61,7 @@ async function getPlanetsData() {
 
     return planets;
   } catch (err) {
-    console.error('❌ Ошибка API планет:', err.message);
+    console.error('❌ Ошибка API планет:', err.message, err.stack || '');
     return null;
   }
 }
@@ -69,12 +75,12 @@ async function getHoroscopeFromAPI(planets) {
 
     return response.data?.text || '⚠️ Не удалось получить гороскоп.';
   } catch (err) {
-    console.error('❌ Ошибка при обращении к API гороскопа:', err.message);
+    console.error('❌ Ошибка при обращении к API гороскопа:', err.message, err.stack || '');
     return '⚠️ Не удалось получить гороскоп.';
   }
 }
 
-// Получить полный текст гороскопа (планеты + гороскоп)
+// Получить полный текст гороскопа (планеты + гороскоп), разбитый на части для Discord
 async function getHoroscopeMessage() {
   const planets = await getPlanetsData();
   if (!planets) {
@@ -108,6 +114,7 @@ async function getHoroscopeMessage() {
   return parts;
 }
 
+// Запускаем cron-задачу на отправку гороскопа в канал "бот" каждый день в 00:00 по Москве
 function startHoroscopeTask(client, guildId) {
   cron.schedule('0 0 * * *', async () => {
     try {
@@ -134,7 +141,7 @@ function startHoroscopeTask(client, guildId) {
 
       console.log('✅ Гороскоп отправлен в канал "бот"');
     } catch (err) {
-      console.error('❌ Ошибка при отправке гороскопа:', err.message);
+      console.error('❌ Ошибка при отправке гороскопа:', err.message, err.stack || '');
     }
   }, {
     timezone: 'Europe/Moscow'
