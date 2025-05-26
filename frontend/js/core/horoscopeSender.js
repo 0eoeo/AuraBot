@@ -116,7 +116,7 @@ async function getHoroscopeMessage() {
 
 // Запускаем cron-задачу на отправку гороскопа в канал "бот" каждый день в 00:00 по Москве
 function startHoroscopeTask(client, guildId) {
-  cron.schedule('0 0 * * *', async () => {
+  cron.schedule('0 12 * * *', async () => {
     try {
       const guild = await client.guilds.fetch(guildId);
       const channel = guild.channels.cache.find(ch => ch.name === 'бот' && ch.isTextBased());
