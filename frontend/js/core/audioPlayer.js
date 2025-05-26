@@ -2,10 +2,23 @@ const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerSta
 const play = require('play-dl');
 const fs = require('fs');
 
+function parseCookiesFromNetscapeFile(filePath) {
+  const cookieLines = fs.readFileSync(filePath, 'utf8').split('\n');
+  const cookies = cookieLines.filter(line => line && !line.startsWith('#')).map(line => {
+    const parts = line.split('\t');
+    const name = parts[5];
+    const value = parts[6];
+    return `${name}=${value}`;
+  });
+  return cookies.join('; ');
+}
+
 (async () => {
+  const cookies = parseCookiesFromNetscapeFile('./cookies.txt');
+
   await play.setToken({
     youtube: {
-      cookie: fs.readFileSync('./cookies.txt', 'utf8')
+      cookie: cookies
     }
   });
 })();
