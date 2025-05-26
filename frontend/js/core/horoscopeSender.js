@@ -37,13 +37,16 @@ async function getPlanetsData() {
     const now = new Date();
     const isoDate = now.toISOString().split('T')[0];
 
-    const response = await axios.get('https://api.freeastrologyapi.com/planets', {
+    const response = await axios.post('https://api.freeastrologyapi.com/api/western/planets', {
+      date: isoDate,
+      location: {
+        lat: 55.7558,
+        lng: 37.6173
+      }
+    }, {
       headers: {
-        'X-API-KEY': ASTRO_API_KEY
-      },
-      params: {
-        date: isoDate,
-        location: 'Moscow'
+        'X-API-KEY': ASTRO_API_KEY,
+        'Content-Type': 'application/json'
       }
     });
 
@@ -53,13 +56,14 @@ async function getPlanetsData() {
     return data.map(planet => ({
       name: planetNamesRu[planet.name] || planet.name,
       sign: zodiacSignsRu[planet.sign] || planet.sign,
-      deg: planet.deg // если нужно, можно добавить градусы
+      deg: planet.deg
     }));
   } catch (err) {
     console.error('❌ Ошибка API планет:', err.message);
     return null;
   }
 }
+
 
 // Запрашиваем гороскоп у FastAPI по положению планет
 async function getHoroscopeFromAPI(planets) {
