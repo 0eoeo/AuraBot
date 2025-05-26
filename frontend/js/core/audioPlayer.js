@@ -9,46 +9,36 @@ const {
 } = require('@discordjs/voice');
 const { spawn } = require('child_process');
 const ffmpeg = require('ffmpeg-static');
-const ytdlpExec = require('yt-dlp-exec');
+const ytdlpExec = require('youtube-dl-exec');
 const fs = require('fs');
 
 async function playMusicInVoiceChannel(url, interaction) {
-  try {
-    const voiceChannel = interaction.member.voice.channel;
-    if (!voiceChannel) {
-      if (!interaction.replied && !interaction.deferred) {
-        return await interaction.reply({ content: '🔇 Ты должен быть в голосовом канале!', ephemeral: true });
-      } else if (interaction.deferred && !interaction.replied) {
-        return await interaction.editReply('🔇 Ты должен быть в голосовом канале!');
-      }
-      return;
+  if (!interaction.member.voice.channel) {
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply('Ты должен быть в голосовом канале!');
     }
-
-    // Обязательно дефирим сразу, если это долгое действие
-    if (!interaction.deferred && !interaction.replied) {
-      await interaction.deferReply();
-    }
-
-    // ... Твой код для joinVoiceChannel и yt-dlp
-
-    // После получения информации об аудио отправляем ответ
-    if (interaction.deferred && !interaction.replied) {
-      await interaction.editReply(`🎶 Воспроизвожу: **${info.title}**`);
-    }
-
-  } catch (error) {
-    console.error('❌ Ошибка в playMusicInVoiceChannel:', error);
-    const msg = '❌ Не удалось воспроизвести музыку. Убедись, что ссылка корректна и видео доступно.';
-    try {
-      if (!interaction.replied && !interaction.deferred) {
-        await interaction.reply({ content: msg, ephemeral: true });
-      } else if (interaction.deferred && !interaction.replied) {
-        await interaction.editReply(msg);
-      }
-    } catch (e) {
-      console.error('Не удалось отправить сообщение об ошибке:', e);
-    }
+    return;
   }
+
+  const voiceChannel = interaction.member.voice.channel;
+  const connection = await voiceChannel.join();
+
+  const stream = ytdlpExec.raw(url, {
+    o: '-',
+    q: '',
+    f: 'bestaudio[ext=webm+acodec=opus+asr=48000]/bestaudio',
+    r: '100K'
+  });
+
+  const dispatcher = connection.play(stream, { type: 'opus' });
+
+  dispatcher.on('finish', () => {
+    voiceChannel.leave();
+  });
+
+  dispatcher.on('error', console.error);
+
+  await interaction.reply(`🎶 Играет: ${url}`);
 }
 
 
