@@ -2,44 +2,58 @@ const {
   joinVoiceChannel,
   createAudioPlayer,
   createAudioResource,
-  entersState,
   AudioPlayerStatus,
-  StreamType,
-  VoiceConnectionStatus
+  StreamType
 } = require('@discordjs/voice');
-const { spawn } = require('child_process');
-const ffmpeg = require('ffmpeg-static');
-const ytdlpExec = require('youtube-dl-exec');
-const fs = require('fs');
+
+const play = require('play-dl');
 
 async function playMusicInVoiceChannel(url, interaction) {
-  if (!interaction.member.voice.channel) {
-    if (!interaction.replied && !interaction.deferred) {
-      await interaction.reply('Ты должен быть в голосовом канале!');
-    }
-    return;
+  const voiceChannel = interaction.member.voice.channel;
+
+  if (!voiceChannel) {
+    return interaction.reply('❌ Ты должен быть в голосовом канале, чтобы включить музыку!');
   }
 
-  const voiceChannel = interaction.member.voice.channel;
-  const connection = await voiceChannel.join();
-
-  const stream = ytdlpExec.raw(url, {
-    o: '-',
-    q: '',
-    f: 'bestaudio[ext=webm+acodec=opus+asr=48000]/bestaudio',
-    r: '100K'
+  const connection = joinVoiceChannel({
+    channelId: voiceChannel.id,
+    guildId: voiceChannel.guild.id,
+    adapterCreator: voiceChannel.guild.voiceAdapterCreator,
   });
 
-  const dispatcher = connection.play(stream, { type: 'opus' });
+  const player = createAudioPlayer();
 
-  dispatcher.on('finish', () => {
-    voiceChannel.leave();
-  });
+  connection.subscribe(player);
 
-  dispatcher.on('error', console.error);
+  try {
+    // Получаем аудио-поток с YouTube
+    const stream = await play.stream(url);
 
-  await interaction.reply(`🎶 Играет: ${url}`);
+    const resource = createAudioResource(stream.stream, {
+      inputType: stream.type,
+    });
+
+    player.play(resource);
+
+    player.on(AudioPlayerStatus.Playing, () => {
+      interaction.reply(`🎶 Сейчас играет: ${url}`);
+    });
+
+    player.on(AudioPlayerStatus.Idle, () => {
+      connection.destroy();
+    });
+
+    player.on('error', error => {
+      console.error('Ошибка аудио-плеера:', error);
+      interaction.channel.send('❌ Ошибка воспроизведения музыки.');
+      connection.destroy();
+    });
+
+  } catch (error) {
+    console.error('Ошибка при воспроизведении:', error);
+    interaction.reply('❌ Не удалось воспроизвести аудио.');
+    connection.destroy();
+  }
 }
-
 
 module.exports = { playMusicInVoiceChannel };
