@@ -10,3 +10,12 @@ class VoiceRequest(BaseModel):
 
 class AudioRequest(BaseModel):
     audio: List[float]
+
+class Planet(BaseModel):
+    name: str
+    sign: str
+    deg: float
+    retro: bool
+
+class HoroscopeRequest(BaseModel):
+    planets: List[Planet]

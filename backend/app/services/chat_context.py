@@ -6,6 +6,7 @@ from langchain.schema import HumanMessage, SystemMessage
 from langchain_community.chat_models.gigachat import GigaChat
 from gigachat import GigaChat as gc
 from backend.app.config import GIGACHAT_TOKEN, OBSCENE_PATTERNS, OBSCENE_REPLACEMENTS
+from backend.app.models import request_models
 
 
 class ChatContextManager:
@@ -117,24 +118,23 @@ class ChatContextManager:
             print(f"❌ Ошибка GigaChat: {e}")
             return None
 
-    async def get_response_horoscope(self, planets: list[dict]):
+    async def get_response_horoscope(self, horo_request: request_models.HoroscopeRequest):
         try:
-            prompt = self._build_horoscope_prompt(planets)
+            prompt = self._build_horoscope_prompt(horo_request.planets)  # 👈 .planets
 
-            # очищаем историю и начинаем заново
             self.messages = [HumanMessage(content=prompt)]
             response = self.chat.invoke(self.messages)
             self.messages.append(response)
 
             print(f"🔮 Гороскоп: {response.content}")
 
-            return response.content.strip().split("\n\n")  # если хотим по знакам
+            return response.content.strip().split("\n\n")
         except Exception as e:
             print(f"❌ Ошибка при генерации гороскопа: {e}")
             return None
 
-    def _build_horoscope_prompt(self, planets: list[dict]) -> str:
-        formatted = "\n".join([f"{p['name']} в знаке {p['sign']}" for p in planets])
+    def _build_horoscope_prompt(self, planets: list[request_models.Planet]) -> str:
+        formatted = "\n".join([f"{p.name} в знаке {p.sign}" for p in planets])
         return (
             "Ты астролог. Пользователь прислал положение планет в гороскопе:\n\n"
             f"{formatted}\n\n"
