@@ -17,14 +17,16 @@ async function playMusicInVoiceChannel(url, interaction) {
     const voiceChannel = interaction.member.voice.channel;
     if (!voiceChannel) {
       const msg = '🔇 Ты должен быть в голосовом канале!';
+      // Если интеракция не была обработана — отвечаем reply, иначе editReply
       if (!interaction.replied && !interaction.deferred) {
         await interaction.reply({ content: msg, ephemeral: true });
-      } else {
+      } else if (interaction.deferred && !interaction.replied) {
         await interaction.editReply(msg);
       }
       return;
     }
 
+    // Делаем defer только если это не сделано
     if (!interaction.deferred && !interaction.replied) {
       await interaction.deferReply();
     }
@@ -46,10 +48,9 @@ async function playMusicInVoiceChannel(url, interaction) {
 
     await entersState(connection, VoiceConnectionStatus.Ready, 30_000);
 
-    // Опционально проверяем cookies.txt
     const cookiesExists = fs.existsSync('cookies.txt');
 
-    // Получаем JSON с info о видео (форматы, метаданные)
+    // Получаем инфо о видео/аудио
     const info = await ytdlpExec(url, {
       dumpSingleJson: true,
       noWarnings: true,
@@ -62,19 +63,16 @@ async function playMusicInVoiceChannel(url, interaction) {
       ...(cookiesExists ? { cookies: 'cookies.txt' } : {}),
     });
 
-    // Фильтруем аудиоформаты с URL
     const audioFormats = info.formats
       .filter(f => f.acodec !== 'none' && f.url)
       .sort((a, b) => (b.abr || 0) - (a.abr || 0));
 
     if (!audioFormats.length) throw new Error('❌ Не найдено аудиоформатов');
 
-    // Берём лучший аудиоформат
     const bestAudio = audioFormats[0];
 
     console.log('▶️ Воспроизводим:', info.title);
 
-    // Запускаем ffmpeg для конвертации потока в raw PCM для Discord
     const ffmpegProcess = spawn(ffmpeg, [
       '-i', bestAudio.url,
       '-f', 's16le',
@@ -113,8 +111,12 @@ async function playMusicInVoiceChannel(url, interaction) {
       if (connection.state.status !== 'destroyed') connection.destroy();
     });
 
+    // Если был defer и еще не был ответ — отвечаем через editReply
     if (interaction.deferred && !interaction.replied) {
       await interaction.editReply(`🎶 Воспроизвожу: **${info.title}**`);
+    } else if (!interaction.deferred && !interaction.replied) {
+      // Если случайно defer не вызван, отвечаем сразу
+      await interaction.reply(`🎶 Воспроизвожу: **${info.title}**`);
     }
 
   } catch (error) {
@@ -123,7 +125,7 @@ async function playMusicInVoiceChannel(url, interaction) {
     try {
       if (!interaction.replied && !interaction.deferred) {
         await interaction.reply({ content: msg, ephemeral: true });
-      } else {
+      } else if (interaction.deferred && !interaction.replied) {
         await interaction.editReply(msg);
       }
     } catch (e) {
