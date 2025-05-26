@@ -14,16 +14,24 @@ const characters = [
 async function handleInteraction(interaction) {
   const { commandName } = interaction;
 
-  if (commandName === 'horoscope') {
+  if (interaction.commandName === 'horoscope') {
     try {
+      // Если ответ занимает время, то отложить ответ, чтобы не получить таймаут
       await interaction.deferReply();
+
       const message = await getHoroscopeMessage();
+
+      // После получения данных отправляем ответ
       await interaction.editReply(message);
     } catch (error) {
-      console.error('❌ Ошибка при обработке /horoscope:', error);
-      await interaction.editReply('Произошла ошибка при получении гороскопа.');
+      console.error('Ошибка при обработке /horoscope:', error);
+      // Если ошибка, можно отправить follow-up сообщение или отредактировать
+      if (interaction.deferred || interaction.replied) {
+        await interaction.editReply('❌ Ошибка при выполнении команды.');
+      } else {
+        await interaction.reply('❌ Ошибка при выполнении команды.');
+      }
     }
-    return;
   }
 
   if (commandName === 'coin') {
