@@ -37,7 +37,7 @@ async function getPlanetsData() {
     const now = new Date();
     const isoDate = now.toISOString().split('T')[0];
 
-    const response = await axios.post('https://api.freeastrologyapi.com/api/western/planets', {
+    const response = await axios.post('https://json.freeastrologyapi.com/western/planets', {
       date: isoDate,
       location: {
         lat: 55.7558,
