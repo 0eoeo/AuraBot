@@ -16,26 +16,29 @@ async function handleInteraction(interaction) {
   const { commandName } = interaction;
 
   if (commandName === 'horoscope') {
-    if (!interaction.replied && !interaction.deferred) {
-      await interaction.deferReply();
-    }
-    const parts = await getHoroscopeMessage();
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.deferReply();
+      }
 
-    const embeds = parts.map((part, i) =>
-      new EmbedBuilder()
-        .setColor('#0099ff')
-        .setDescription(part)
-        .setFooter({ text: `Страница ${i + 1} из ${parts.length}` })
-    );
+      const parts = await getHoroscopeMessage();
 
-    await interaction.editReply({ embeds: [embeds[0]] });
+      const embeds = parts.map((part, i) =>
+        new EmbedBuilder()
+          .setColor('#0099ff')
+          .setDescription(part)
+          .setFooter({ text: `Страница ${i + 1} из ${parts.length}` })
+      );
 
-    for (let i = 1; i < embeds.length; i++) {
-      await interaction.followUp({ embeds: [embeds[i]], ephemeral: true });
-    }
+      // Отправляем первую часть через editReply
+      await interaction.editReply({ embeds: [embeds[0]] });
 
-    return;
-  }
+      // Отправляем остальные части через followUp, всем видимые (без ephemeral)
+      for (let i = 1; i < embeds.length; i++) {
+        await interaction.followUp({ embeds: [embeds[i]] });
+      }
+  return;
+}
+
 
   if (commandName === 'coin') {
     const amount = interaction.options.getInteger('amount');
