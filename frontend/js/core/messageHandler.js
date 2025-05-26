@@ -3,6 +3,7 @@ const { playMusicInVoiceChannel, skipSong, stopMusic } = require('./audioPlayer'
 const { getUser, updateCoins, addCharacter, getCollection } = require('./db');
 const { handleCasino, handleCollection, handleCoin, handleBalance, handlePrize } = require('./characterHandler');
 const { getHoroscopeMessage } = require('./horoscopeSender');
+const { EmbedBuilder } = require('discord.js')
 
 const characters = [
   { url: 'https://gif.guru/file/aHR0cHM6Ly9pLnBpbmltZy5jb20vb3JpZ2luYWxzL2FmL2UyLzUyL2FmZTI1MjRlMGM1MDQ3YTcwMjRmZjNlMzVjYzJiMDlkLmdpZg.mp4', rarity: 'Common', chance: 0.9 },
@@ -15,12 +16,26 @@ async function handleInteraction(interaction) {
   const { commandName } = interaction;
 
   if (commandName === 'horoscope') {
-      if (!interaction.replied && !interaction.deferred) {
-        await interaction.deferReply();
-      }
-      const message = await getHoroscopeMessage();
-      return await interaction.editReply(message);
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.deferReply();
     }
+    const parts = await getHoroscopeMessage();
+
+    const embeds = parts.map((part, i) =>
+      new EmbedBuilder()
+        .setColor('#0099ff')
+        .setDescription(part)
+        .setFooter({ text: `Страница ${i + 1} из ${parts.length}` })
+    );
+
+    await interaction.editReply({ embeds: [embeds[0]] });
+
+    for (let i = 1; i < embeds.length; i++) {
+      await interaction.followUp({ embeds: [embeds[i]], ephemeral: true });
+    }
+
+    return;
+  }
 
   if (commandName === 'coin') {
     const amount = interaction.options.getInteger('amount');

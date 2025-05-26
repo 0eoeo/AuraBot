@@ -105,11 +105,34 @@ async function getHoroscopeFromAPI(planets) {
 async function getHoroscopeMessage() {
   const planets = await getPlanetsData();
   if (!planets) {
-    return '⚠️ Не удалось получить данные о планетах.';
+    return ['⚠️ Не удалось получить данные о планетах.'];
   }
   const horoscopeText = await getHoroscopeFromAPI(planets);
   const today = new Date().toLocaleDateString('ru-RU');
-  return `🔮 **Гороскоп на ${today}**\n\n${horoscopeText}`;
+  const header = `🔮 **Гороскоп на ${today}**`;
+
+  const maxLen = 1500;
+  const parts = [];
+  parts.push(header);
+
+  let text = horoscopeText;
+  while (text.length > 0) {
+    if (text.length <= maxLen) {
+      parts.push(text);
+      break;
+    }
+    let sliceIndex = text.lastIndexOf('\n', maxLen);
+    if (sliceIndex === -1 || sliceIndex < maxLen / 2) {
+      sliceIndex = text.lastIndexOf(' ', maxLen);
+    }
+    if (sliceIndex === -1 || sliceIndex < maxLen / 2) {
+      sliceIndex = maxLen;
+    }
+    parts.push(text.slice(0, sliceIndex).trim());
+    text = text.slice(sliceIndex).trim();
+  }
+
+  return parts;
 }
 
 // Запускаем ежедневную задачу, отправляющую гороскоп в канал
