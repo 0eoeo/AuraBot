@@ -15,24 +15,35 @@ async function handleInteraction(interaction) {
   const { commandName } = interaction;
 
   if (interaction.commandName === 'horoscope') {
-    try {
-      // Если ответ занимает время, то отложить ответ, чтобы не получить таймаут
-      await interaction.deferReply();
+  try {
+    // Если вы уверены, что ответ может занять >3 сек, деферим
+    await interaction.deferReply();
 
-      const message = await getHoroscopeMessage();
+    const message = await getHoroscopeMessage();
 
-      // После получения данных отправляем ответ
-      await interaction.editReply(message);
-    } catch (error) {
-      console.error('Ошибка при обработке /horoscope:', error);
-      // Если ошибка, можно отправить follow-up сообщение или отредактировать
-      if (interaction.deferred || interaction.replied) {
+    // После получения результата редактируем deferred ответ
+    await interaction.editReply(message);
+
+  } catch (error) {
+    console.error('Ошибка при обработке /horoscope:', error);
+
+    // Если мы уже отложили ответ, редактируем его
+    if (interaction.deferred) {
+      try {
         await interaction.editReply('❌ Ошибка при выполнении команды.');
-      } else {
+      } catch (_) {
+        // Ответ уже отправлен, ничего не делаем
+      }
+    } else if (!interaction.replied) {
+      // Если ответ еще не отправлен - отправляем
+      try {
         await interaction.reply('❌ Ошибка при выполнении команды.');
+      } catch (_) {
+        // Ответ уже отправлен, ничего не делаем
       }
     }
   }
+}
 
   if (commandName === 'coin') {
     const amount = interaction.options.getInteger('amount');
