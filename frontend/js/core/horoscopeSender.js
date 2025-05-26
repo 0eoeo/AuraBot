@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const request = require('request');
 const axios = require('axios');
+const { EmbedBuilder } = require('discord.js');
 
 const ASTRO_API_KEY = process.env.ASTRO_API_KEY;
 
@@ -135,7 +136,6 @@ async function getHoroscopeMessage() {
   return parts;
 }
 
-// Запускаем ежедневную задачу, отправляющую гороскоп в канал
 function startHoroscopeTask(client, guildId) {
   cron.schedule('0 0 * * *', async () => {
     try {
@@ -146,8 +146,20 @@ function startHoroscopeTask(client, guildId) {
         return;
       }
 
-      const message = await getHoroscopeMessage();
-      await channel.send(message);
+      const parts = await getHoroscopeMessage();
+
+      const embeds = parts.map((part, i) =>
+        new EmbedBuilder()
+          .setColor('#0099ff')
+          .setDescription(part)
+          .setFooter({ text: `Страница ${i + 1} из ${parts.length}` })
+      );
+
+      for (const embed of embeds) {
+        await channel.send({ embeds: [embed] });
+        await new Promise(r => setTimeout(r, 500));
+      }
+
       console.log('✅ Гороскоп отправлен в канал "бот"');
     } catch (err) {
       console.error('❌ Ошибка при отправке гороскопа:', err.message);

@@ -39,7 +39,6 @@ async function handleInteraction(interaction) {
   return;
 }
 
-
   if (commandName === 'coin') {
     const amount = interaction.options.getInteger('amount');
     const user = interaction.options.getUser('user');
