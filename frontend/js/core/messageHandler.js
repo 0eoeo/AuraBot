@@ -48,9 +48,20 @@ async function handleInteraction(interaction) {
   }
 
   // Для обработки команд через обычные сообщения
-  if (commandName === 'play') {
-    const url = interaction.options.getString('url'); // Предположим, что это строка URL
-    return playMusicInVoiceChannel(url, interaction);
+  if (interaction.commandName === 'play') {
+    const url = interaction.options.getString('url');
+
+    // НЕ делай deferReply здесь, если он уже делается внутри playMusicInVoiceChannel
+    // await interaction.deferReply();
+
+    try {
+      await playMusicInVoiceChannel(url, interaction);
+    } catch (error) {
+      console.error('Ошибка команды play:', error);
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({ content: 'Произошла ошибка', ephemeral: true });
+      }
+    }
   }
 
   if (commandName === 'skip') {
