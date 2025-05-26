@@ -14,36 +14,25 @@ const characters = [
 async function handleInteraction(interaction) {
   const { commandName } = interaction;
 
-  if (interaction.commandName === 'horoscope') {
-  try {
-    // Если вы уверены, что ответ может занять >3 сек, деферим
-    await interaction.deferReply();
-
-    const message = await getHoroscopeMessage();
-
-    // После получения результата редактируем deferred ответ
-    await interaction.editReply(message);
-
-  } catch (error) {
-    console.error('Ошибка при обработке /horoscope:', error);
-
-    // Если мы уже отложили ответ, редактируем его
-    if (interaction.deferred) {
-      try {
-        await interaction.editReply('❌ Ошибка при выполнении команды.');
-      } catch (_) {
-        // Ответ уже отправлен, ничего не делаем
-      }
-    } else if (!interaction.replied) {
-      // Если ответ еще не отправлен - отправляем
-      try {
-        await interaction.reply('❌ Ошибка при выполнении команды.');
-      } catch (_) {
-        // Ответ уже отправлен, ничего не делаем
+  if (commandName === 'horoscope') {
+    try {
+      await interaction.deferReply();
+      const message = await getHoroscopeMessage();
+      await interaction.editReply(message);
+    } catch (error) {
+      console.error('Ошибка при обработке /horoscope:', error);
+      if (interaction.deferred) {
+        try {
+          await interaction.editReply('❌ Ошибка при выполнении команды.');
+        } catch (_) {}
+      } else if (!interaction.replied) {
+        try {
+          await interaction.reply('❌ Ошибка при выполнении команды.');
+        } catch (_) {}
       }
     }
+    return;
   }
-}
 
   if (commandName === 'coin') {
     const amount = interaction.options.getInteger('amount');
