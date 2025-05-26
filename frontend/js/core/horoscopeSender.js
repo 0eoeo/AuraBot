@@ -5,34 +5,6 @@ const { EmbedBuilder } = require('discord.js');
 
 const ASTRO_API_KEY = process.env.ASTRO_API_KEY;
 
-const planetNamesRu = {
-  Sun: 'Солнце',
-  Moon: 'Луна',
-  Mercury: 'Меркурий',
-  Venus: 'Венера',
-  Mars: 'Марс',
-  Jupiter: 'Юпитер',
-  Saturn: 'Сатурн',
-  Uranus: 'Уран',
-  Neptune: 'Нептун',
-  Pluto: 'Плутон',
-};
-
-const zodiacSignsRu = {
-  Aries: 'Овен',
-  Taurus: 'Телец',
-  Gemini: 'Близнецы',
-  Cancer: 'Рак',
-  Leo: 'Лев',
-  Virgo: 'Дева',
-  Libra: 'Весы',
-  Scorpio: 'Скорпион',
-  Sagittarius: 'Стрелец',
-  Capricorn: 'Козерог',
-  Aquarius: 'Водолей',
-  Pisces: 'Рыбы'
-};
-
 // Получаем положение планет с помощью request и промиса
 async function getPlanetsData() {
   const now = new Date();
@@ -49,7 +21,7 @@ async function getPlanetsData() {
     config: {
       observation_point: 'topocentric',
       ayanamsha: 'tropical',
-      language: 'en'
+      language: 'ru'
     }
   };
 
@@ -68,14 +40,14 @@ async function getPlanetsData() {
     }
 
     const planets = data.output.map(item => {
-      const planetEn = item.planet.en;
-      const signEn = item.zodiac_sign.name.en;
+      const planetRu = item.planet.ru;
+      const signRu = item.zodiac_sign.name.ru;
       const normDeg = item.normDegree;
       const isRetro = item.isRetro.toLowerCase() === 'true';
 
       return {
-        name: planetNamesRu[planetEn] || planetEn,
-        sign: zodiacSignsRu[signEn] || signEn,
+        name: planetRu,
+        sign: signRu,
         deg: normDeg,
         retro: isRetro
       };
