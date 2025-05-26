@@ -3,6 +3,7 @@ const { handleInteraction } = require('./core/messageHandler');
 const { handleTextMessage } = require('./core/textHandler');
 const { getGuildState } = require('./core/voiceManager');
 const { startVoiceCoinsTask } = require('./core/characterHandler');
+const { startHoroscopeTask } = require('./core/horoscopeSender');
 const express = require('express');
 require('dotenv').config({ path: '../.env' });
 
@@ -34,6 +35,7 @@ const client = new Client({
 client.once('ready', () => {
   console.log(`✅ Бот запущен как ${client.user.tag}`);
   startVoiceCoinsTask(client, GUILD_ID);
+  startHoroscopeTask(client, GUILD_ID);
 });
 
 // 💬 Обработка текстовых сообщений

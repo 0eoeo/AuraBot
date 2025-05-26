@@ -1,5 +1,4 @@
 import re
-from pprint import pprint
 
 import requests
 import shutil
@@ -117,3 +116,29 @@ class ChatContextManager:
         except Exception as e:
             print(f"❌ Ошибка GigaChat: {e}")
             return None
+
+    async def get_response_horoscope(self, planets: list[dict]):
+        try:
+            prompt = self._build_horoscope_prompt(planets)
+
+            # очищаем историю и начинаем заново
+            self.messages = [HumanMessage(content=prompt)]
+            response = self.chat.invoke(self.messages)
+            self.messages.append(response)
+
+            print(f"🔮 Гороскоп: {response.content}")
+
+            return response.content.strip().split("\n\n")  # если хотим по знакам
+        except Exception as e:
+            print(f"❌ Ошибка при генерации гороскопа: {e}")
+            return None
+
+    def _build_horoscope_prompt(self, planets: list[dict]) -> str:
+        formatted = "\n".join([f"{p['name']} в знаке {p['sign']}" for p in planets])
+        return (
+            "Ты астролог. Пользователь прислал положение планет в гороскопе:\n\n"
+            f"{formatted}\n\n"
+            "На основе этого положения составь смешной короткий гороскоп для всех 12 знаков зодиака на сегодня.\n"
+            "Для каждого знака укажи, как эти планеты повлияют на его день. Пиши на русском языке, в дружелюбном стиле и с приколами.\n"
+            "Формат ответа: '♈ Овен: ...', '♉ Телец: ...' и так далее по всем знакам."
+        )

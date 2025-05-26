@@ -2,6 +2,7 @@ const { joinVoice, leaveVoice } = require('./voiceManager');
 const { playMusicInVoiceChannel, skipSong, stopMusic } = require('./audioPlayer');
 const { getUser, updateCoins, addCharacter, getCollection } = require('./db');
 const { handleCasino, handleCollection, handleCoin, handleBalance, handlePrize } = require('./characterHandler');
+const { getHoroscopeMessage } = require('./horoscopeSender');
 
 const characters = [
   { url: 'https://gif.guru/file/aHR0cHM6Ly9pLnBpbmltZy5jb20vb3JpZ2luYWxzL2FmL2UyLzUyL2FmZTI1MjRlMGM1MDQ3YTcwMjRmZjNlMzVjYzJiMDlkLmdpZg.mp4', rarity: 'Common', chance: 0.9 },
@@ -12,6 +13,18 @@ const characters = [
 
 async function handleInteraction(interaction) {
   const { commandName } = interaction;
+
+  if (commandName === 'horoscope') {
+    try {
+      await interaction.deferReply();
+      const message = await getHoroscopeMessage();
+      await interaction.editReply(message);
+    } catch (error) {
+      console.error('❌ Ошибка при обработке /horoscope:', error);
+      await interaction.editReply('Произошла ошибка при получении гороскопа.');
+    }
+    return;
+  }
 
   if (commandName === 'coin') {
     const amount = interaction.options.getInteger('amount');

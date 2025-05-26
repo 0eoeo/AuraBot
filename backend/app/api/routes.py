@@ -89,3 +89,27 @@ async def recognize(request: Request, audio_data: AudioRequest):
         )
 
     return StreamingResponse(iter([b""]), media_type="audio/wav")
+
+
+@router.post("/horoscope")
+async def interpret_horoscope(horo_req):
+    interpretations = await chat_context.get_response_horoscope(horo_req)
+
+    if not interpretations:
+        return {
+            "type": "text",
+            "text": "🔍 Не удалось интерпретировать расположение планет."
+        }
+
+    # если возвращается строка — просто выводим её
+    if isinstance(interpretations, str):
+        return {
+            "type": "text",
+            "text": interpretations
+        }
+
+    # если это список (по абзацам)
+    return {
+        "type": "text",
+        "text": "\n\n".join(interpretations)
+    }
