@@ -1,5 +1,5 @@
 const cron = require('node-cron');
-const axios = require('axios');
+const request = require('request');
 
 const ASTRO_API_KEY = process.env.ASTRO_API_KEY;
 
@@ -31,39 +31,62 @@ const zodiacSignsRu = {
   Pisces: 'Рыбы'
 };
 
-// Получаем положение планет
-async function getPlanetsData() {
-  try {
+// Получаем положение планет с помощью request и промиса
+function getPlanetsData() {
+  return new Promise((resolve, reject) => {
     const now = new Date();
-    const isoDate = now.toISOString().split('T')[0];
 
-    const response = await axios.post('https://json.freeastrologyapi.com/western/planets', {
-      date: isoDate,
-      location: {
-        lat: 55.7558,
-        lng: 37.6173
-      }
-    }, {
+    const options = {
+      method: 'POST',
+      url: 'https://json.freeastrologyapi.com/western/planets',
       headers: {
-        'X-API-KEY': ASTRO_API_KEY,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'x-api-key': ASTRO_API_KEY
+      },
+      body: JSON.stringify({
+        year: now.getUTCFullYear(),
+        month: now.getUTCMonth() + 1,
+        date: now.getUTCDate(),
+        hours: now.getUTCHours(),
+        minutes: now.getUTCMinutes(),
+        seconds: now.getUTCSeconds(),
+        latitude: 55.7558,
+        longitude: 37.6173,
+        timezone: 3, // Москва UTC+3
+        config: {
+          observation_point: 'topocentric',
+          ayanamsha: 'tropical',
+          language: 'ru'
+        }
+      })
+    };
+
+    request(options, (error, response) => {
+      if (error) {
+        console.error('❌ Ошибка API планет:', error.message);
+        return resolve(null);
+      }
+
+      try {
+        const data = JSON.parse(response.body);
+        if (!data || !data.planets || !Array.isArray(data.planets)) {
+          throw new Error('Неверный формат данных');
+        }
+
+        const planets = data.planets.map(planet => ({
+          name: planetNamesRu[planet.name] || planet.name,
+          sign: zodiacSignsRu[planet.sign] || planet.sign,
+          deg: planet.deg
+        }));
+
+        resolve(planets);
+      } catch (err) {
+        console.error('❌ Ошибка обработки ответа API планет:', err.message);
+        resolve(null);
       }
     });
-
-    const data = response.data?.data;
-    if (!data || !Array.isArray(data)) throw new Error('Неверный формат данных');
-
-    return data.map(planet => ({
-      name: planetNamesRu[planet.name] || planet.name,
-      sign: zodiacSignsRu[planet.sign] || planet.sign,
-      deg: planet.deg
-    }));
-  } catch (err) {
-    console.error('❌ Ошибка API планет:', err.message);
-    return null;
-  }
+  });
 }
-
 
 // Запрашиваем гороскоп у FastAPI по положению планет
 async function getHoroscopeFromAPI(planets) {
