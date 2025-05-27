@@ -1,101 +1,270 @@
-const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, StreamType } = require('@discordjs/voice');
-const ytdlp = require('yt-dlp-exec');
-const ffmpeg = require('fluent-ffmpeg');
-const ffmpegPath = require('ffmpeg-static');
-const { PassThrough } = require('stream');
+const {
+  joinVoiceChannel,
+  createAudioPlayer,
+  createAudioResource,
+  AudioPlayerStatus,
+  StreamType
+} = require('@discordjs/voice');
+const { spawn } = require('child_process');
+const ffmpeg = require('ffmpeg-static');
+const voiceManager = require('./voiceManager');
 
-ffmpeg.setFfmpegPath(ffmpegPath);
+function createStream(url, onError) {
+  const ytdlp = spawn('yt-dlp', ['-f', 'bestaudio', '-o', '-', url]);
+  const ffmpegProcess = spawn(ffmpeg, [
+    '-i', 'pipe:0',
+    '-f', 's16le',
+    '-ar', '48000',
+    '-ac', '2',
+    'pipe:1'
+  ]);
 
-async function playMusicInVoiceChannel(url, interaction) {
-const voiceChannel = interaction.member?.voice?.channel;
+  let pipeActive = true;
 
-if (!voiceChannel) {
-return interaction.reply('❌ Ты должен быть в голосовом канале!');
-}
-
-const connection = joinVoiceChannel({
-channelId: voiceChannel.id,
-guildId: voiceChannel.guild.id,
-adapterCreator: voiceChannel.guild.voiceAdapterCreator,
-});
-
-const player = createAudioPlayer();
-connection.subscribe(player);
-
-try {
-// Получаем аудио поток с YouTube
-const ytStream = ytdlp.exec(url, {
-output: '-',
-format: 'bestaudio',
-quiet: true,
-restrictFilenames: true,
-noWarnings: true,
-});
-
-javascript
-Копировать
-Редактировать
-const ffmpegStream = new PassThrough();
-
-// Преобразуем поток через ffmpeg в подходящий формат
-ffmpeg(ytStream.stdout)
-  .audioCodec('libopus')
-  .format('opus')
-  .on('error', (err) => {
-    console.error('FFmpeg error:', err.message);
-    if (!interaction.replied && !interaction.deferred) {
-      interaction.reply('❌ Ошибка при обработке аудио.');
+  function cleanupPipe() {
+    if (pipeActive) {
+      pipeActive = false;
+      try {
+        ytdlp.stdout.unpipe(ffmpegProcess.stdin);
+      } catch {}
+      try {
+        if (!ffmpegProcess.stdin.destroyed) ffmpegProcess.stdin.end();
+      } catch {}
     }
-    connection.destroy();
-  })
-  .pipe(ffmpegStream, { end: true });
+  }
 
-const resource = createAudioResource(ffmpegStream, {
-  inputType: StreamType.Opus,
-});
+  ytdlp.stderr.on('data', data => console.warn(`yt-dlp stderr: ${data}`));
+  ffmpegProcess.stderr.on('data', data => console.warn(`ffmpeg stderr: ${data}`));
 
-player.play(resource);
+  ytdlp.on('error', error => {
+    console.error('yt-dlp error:', error);
+    cleanupPipe();
+    onError?.(error);
+  });
 
-player.once(AudioPlayerStatus.Playing, async () => {
+  ffmpegProcess.on('error', error => {
+    console.error('ffmpeg error:', error);
+    cleanupPipe();
+    onError?.(error);
+  });
+
+  ytdlp.on('close', code => {
+    if (code !== 0) console.warn(`yt-dlp exited with code ${code}`);
+    cleanupPipe();
+  });
+
+  ffmpegProcess.on('close', code => {
+    if (code !== 0) console.warn(`ffmpeg exited with code ${code}`);
+    cleanupPipe();
+  });
+
+  // Обработка ошибок pipe (например, EPIPE)
+  ytdlp.stdout.on('error', err => {
+    if (err.code === 'EPIPE') {
+      // Обычно происходит, если ffmpegProcess.stdin закрылся
+      // Можно просто игнорировать или залогировать
+      console.warn('yt-dlp.stdout EPIPE error:', err);
+    } else {
+      console.error('yt-dlp.stdout error:', err);
+      cleanupPipe();
+      onError?.(err);
+    }
+  });
+
+  ffmpegProcess.stdin.on('error', err => {
+    if (err.code === 'EPIPE') {
+      console.warn('ffmpegProcess.stdin EPIPE error:', err);
+    } else {
+      console.error('ffmpegProcess.stdin error:', err);
+      cleanupPipe();
+      onError?.(err);
+    }
+  });
+
   try {
-    if (!interaction.replied && !interaction.deferred) {
-      await interaction.reply(`🎶 Сейчас играет: ${url}`);
+    if (!ytdlp.stdout.destroyed && !ffmpegProcess.stdin.destroyed) {
+      ytdlp.stdout.pipe(ffmpegProcess.stdin);
     }
   } catch (err) {
-    console.warn('⚠️ Не удалось отправить reply:', err.message);
+    console.error('❗ Ошибка pipe:', err);
+    cleanupPipe();
+    onError?.(err);
   }
-});
 
-player.once(AudioPlayerStatus.Idle, () => {
-  connection.destroy();
-});
+  return {
+    stream: ffmpegProcess.stdout,
+    processes: [ytdlp, ffmpegProcess]
+  };
+}
 
-player.on('error', async (error) => {
-  console.error('Ошибка аудио:', error);
+function playNext(guildId) {
+  const state = voiceManager.getGuildState(guildId);
+  if (!state || state._isPlayingNext) return;
+
+  state._isPlayingNext = true;
+
+  if (state.isSkipping) {
+    state.isSkipping = false;
+    state._isPlayingNext = false;
+    return;
+  }
+
+  const next = state.playbackQueue.shift();
+
+  if (state.currentProcesses?.length) {
+    state.currentProcesses.forEach(proc => {
+      if (!proc.killed) proc.kill();
+    });
+    state.currentProcesses = null;
+  }
+
+  if (!next) {
+    state.player.stop();
+    try {
+      if (state.connection && state.connection.state.status !== 'destroyed') {
+        state.connection.destroy();
+      }
+    } catch (e) {
+      console.warn('❗ Ошибка при уничтожении соединения:', e);
+    }
+    voiceManager.clearGuildState(guildId);
+    state._isPlayingNext = false;
+    return;
+  }
+
+  const { stream, processes } = createStream(next.url, error => {
+    console.error('Ошибка во время создания потока:', error);
+    state._isPlayingNext = false;
+    playNext(guildId);
+  });
+
+  state.currentProcesses = processes;
+
+  const resource = createAudioResource(stream, {
+    inputType: StreamType.Raw
+  });
+
+  state.currentTrack = next;
+  state.player.play(resource);
+  state._isPlayingNext = false;
+}
+
+async function playMusicInVoiceChannel(url, interaction) {
+  const voiceChannel = interaction.member.voice.channel;
+  if (!voiceChannel) {
+    return safeReply(interaction, '❗ Ты должен быть в голосовом канале!');
+  }
+
+  let state = voiceManager.getGuildState(interaction.guild.id);
+  if (!state) {
+    const connection = joinVoiceChannel({
+      channelId: voiceChannel.id,
+      guildId: interaction.guild.id,
+      adapterCreator: interaction.guild.voiceAdapterCreator
+    });
+
+    const player = createAudioPlayer();
+    connection.subscribe(player);
+
+    state = {
+      player,
+      connection,
+      playbackQueue: [],
+      currentTrack: null,
+      currentProcesses: null,
+      isSkipping: false,
+      _isPlayingNext: false
+    };
+
+    voiceManager.setGuildState(interaction.guild.id, state);
+
+    player.on(AudioPlayerStatus.Idle, () => {
+      playNext(interaction.guild.id);
+    });
+
+    player.on('error', error => {
+      console.error('🎧 Ошибка проигрывания:', error);
+      playNext(interaction.guild.id);
+    });
+  }
+
+  state.playbackQueue.push({ url, requestedBy: interaction.user.username });
+
+  if (state.player.state.status !== AudioPlayerStatus.Playing) {
+    playNext(interaction.guild.id);
+  }
+
+  await safeReply(interaction, `🎶 Добавлено ${interaction.user.username} в очередь: ${url}`);
+}
+
+function skipSong(interaction) {
+  const state = voiceManager.getGuildState(interaction.guild.id);
+  if (!state || !state.player) {
+    return safeReply(interaction, '❗ Нет музыки для пропуска.');
+  }
+
+  state.isSkipping = true;
+
+  if (state.currentProcesses?.length) {
+    state.currentProcesses.forEach(proc => {
+      if (!proc.killed) proc.kill();
+    });
+    state.currentProcesses = null;
+  }
+
+  safeReply(interaction, '⏭️ Пропускаем песню...');
+
+  // Останавливаем плеер, затем запускаем playNext, чтобы заново создать поток и начать следующую песню
+  state.player.stop();
+  playNext(interaction.guild.id);
+}
+
+async function stopMusic(interaction) {
+  const state = voiceManager.getGuildState(interaction.guild.id);
+  if (!state) {
+    return safeReply(interaction, '❗ Нет музыки для остановки.');
+  }
+
+  if (state.currentProcesses) {
+    state.currentProcesses.forEach(proc => {
+      if (!proc.killed) proc.kill();
+    });
+    state.currentProcesses = null;
+  }
+
+  state.playbackQueue = [];
+  state.currentTrack = null;
+
+  state.player.removeAllListeners();
+
+  state.player.stop();
+
   try {
-    if (!interaction.replied && !interaction.deferred) {
-      await interaction.reply('❌ Ошибка воспроизведения аудио.');
-    } else {
-      await interaction.followUp('❌ Ошибка воспроизведения аудио.');
+    if (state.connection && state.connection.state.status !== 'destroyed') {
+      state.connection.destroy();
     }
   } catch (e) {
-    console.warn('⚠️ Не удалось отправить сообщение об ошибке:', e.message);
+    console.warn('❗ Ошибка при уничтожении соединения:', e);
   }
-  connection.destroy();
-});
-} catch (error) {
-console.error('❌ Общая ошибка воспроизведения:', error);
-try {
-if (!interaction.replied && !interaction.deferred) {
-await interaction.reply('❌ Ошибка воспроизведения. Возможно, видео недоступно.');
-} else {
-await interaction.followUp('❌ Ошибка воспроизведения. Возможно, видео недоступно.');
-}
-} catch (e) {
-console.warn('⚠️ Не удалось отправить сообщение об ошибке:', e.message);
-}
-connection.destroy();
-}
+
+  voiceManager.clearGuildState(interaction.guild.id);
+  await safeReply(interaction, '⏹️ Музыка остановлена.');
 }
 
-module.exports = { playMusicInVoiceChannel };
+async function safeReply(interaction, text) {
+  try {
+    if (interaction.replied || interaction.deferred) {
+      await interaction.editReply(text).catch(console.warn);
+    } else {
+      await interaction.reply(text).catch(console.warn);
+    }
+  } catch (e) {
+    console.warn('⚠️ Не удалось отправить сообщение:', e);
+  }
+}
+
+module.exports = {
+  playMusicInVoiceChannel,
+  skipSong,
+  stopMusic
+};

@@ -53,10 +53,30 @@ async function handleInteraction(interaction) {
       }
 
       case 'play': {
-        const url = interaction.options.getString('url');
-        await playMusicInVoiceChannel(url, interaction);
-        break;
-      }
+          const url = interaction.options.getString('url');
+
+          try {
+            // Пытаемся сразу проиграть музыку
+            await playMusicInVoiceChannel(url, interaction);
+          } catch (error) {
+            console.error('Ошибка воспроизведения музыки:', error);
+
+            // Ответ, если что-то пошло не так
+            if (interaction.replied || interaction.deferred) {
+              await interaction.followUp({
+                content: '❌ Ошибка при воспроизведении музыки: ' + error.message,
+                ephemeral: true
+              });
+            } else {
+              await interaction.reply({
+                content: '❌ Ошибка при воспроизведении музыки: ' + error.message,
+                ephemeral: true
+              });
+            }
+          }
+
+          break;
+        }
 
       case 'skip': {
         await skipSong(interaction);
