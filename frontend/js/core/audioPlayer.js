@@ -1,7 +1,8 @@
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus } = require('@discordjs/voice');
 const { spawn } = require('child_process');
-const path = require('path');
-const ytdlpExecPath = require('yt-dlp-exec').bin;
+const ffmpegPath = require('ffmpeg-static');
+const prism = require('prism-media');
+const ytdlp = require('yt-dlp-exec');
 
 async function playMusicInVoiceChannel(url, interaction) {
   const voiceChannel = interaction.member?.voice?.channel;
@@ -20,16 +21,31 @@ async function playMusicInVoiceChannel(url, interaction) {
   connection.subscribe(player);
 
   try {
-    const process = spawn(ytdlpExecPath, [
-      '-f', 'bestaudio',
-      '-o', '-',
-      '--quiet',
-      '--no-warnings',
-      '--cookies', path.join(__dirname, 'cookies.txt'),
-      url
-    ], { stdio: ['ignore', 'pipe', 'ignore'] });
+    // 1. Скачиваем аудио с YouTube
+    const stream = ytdlp.exec(url, {
+      output: '-',
+      quiet: true,
+      format: 'bestaudio',
+    });
 
-    const resource = createAudioResource(process.stdout, {
+    // 2. Преобразуем в формат Discord с помощью ffmpeg через prism-media
+    const transcoder = new prism.FFmpeg({
+      args: [
+        '-analyzeduration', '0',
+        '-loglevel', '0',
+        '-i', 'pipe:0',
+        '-f', 's16le',
+        '-ar', '48000',
+        '-ac', '2',
+        'pipe:1'
+      ],
+      shell: false,
+      executable: ffmpegPath,
+    });
+
+    const opusStream = stream.stdout.pipe(transcoder);
+
+    const resource = createAudioResource(opusStream, {
       inputType: 'arbitrary',
     });
 
