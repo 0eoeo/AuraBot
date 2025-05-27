@@ -1,9 +1,7 @@
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus } = require('@discordjs/voice');
-const { spawn } = require('child_process');
-const fs = require('fs');
+const ytdlp = require('yt-dlp-exec');
 const path = require('path');
 
-// 🎵 Функция для воспроизведения музыки
 async function playMusicInVoiceChannel(url, interaction) {
   const voiceChannel = interaction.member?.voice?.channel;
 
@@ -21,15 +19,18 @@ async function playMusicInVoiceChannel(url, interaction) {
   connection.subscribe(player);
 
   try {
-    // Запускаем yt-dlp для получения аудио потока
-    const process = spawn('yt-dlp', [
-      '-f', 'bestaudio',
-      '-o', '-',         // Выводим поток в stdout
-      '--quiet',
-      '--no-warnings',
-      '--cookies', path.join(__dirname, 'cookies.txt'),
-      url
-    ], { stdio: ['ignore', 'pipe', 'ignore'] });
+    // Запускаем yt-dlp-exec и получаем stdout как поток
+    const process = ytdlp.raw(
+      url,
+      {
+        format: 'bestaudio',
+        output: '-',
+        quiet: true,
+        noWarnings: true,
+        cookies: path.join(__dirname, 'cookies.txt'),
+      },
+      { stdio: ['ignore', 'pipe', 'ignore'] }
+    );
 
     const resource = createAudioResource(process.stdout, {
       inputType: 'arbitrary',
