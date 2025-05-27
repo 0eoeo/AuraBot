@@ -11,9 +11,8 @@ const voiceManager = require('./voiceManager');
 
 function createStream(url, onError) {
   const cookiesPath = 'cookies.txt';
-  const ytdlp = spawn('yt-dlp', ['-f', 'bestaudio', '-o', '-', url]);
+  const ytdlp = spawn('yt-dlp', ['--cookies', cookiesPath, '-f', 'bestaudio', '-o', '-', url]);
   const ffmpegProcess = spawn(ffmpeg, [
-    '--cookies', cookiesPath,
     '-i', 'pipe:0',
     '-f', 's16le',
     '-ar', '48000',
