@@ -118,6 +118,28 @@ async function handleInteraction(interaction) {
         break;
       }
 
+      case 'secret': {
+      const code = interaction.options.getString('code');
+
+      const secretCode = 'HUY1337FATCOCK';
+
+      if (code === secretCode) {
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply('С днем рождения... Что с твоим взглядом? Ну же, я обещаю, что это действительно твой особенный день. И нет, на этот раз я не играю ни в какие игры. Что ж, вижу, что ты ничего не планировал, так что... Ты позволишь мне заполучить тебя целиком, на весь день?');
+        } else {
+          await interaction.editReply('С днем рождения... Что с твоим взглядом? Ну же, я обещаю, что это действительно твой особенный день. И нет, на этот раз я не играю ни в какие игры. Что ж, вижу, что ты ничего не планировал, так что... Ты позволишь мне заполучить тебя целиком, на весь день?');
+        }
+      } else {
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: 'Неверный код.', ephemeral: true });
+        } else {
+          await interaction.editReply('Неверный код.');
+        }
+      }
+      break;
+    }
+
+
       default: {
         if (!interaction.replied && !interaction.deferred) {
           await interaction.reply({ content: 'Неизвестная команда.', ephemeral: true });
